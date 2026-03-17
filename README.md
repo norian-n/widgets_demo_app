@@ -1,1 +1,1 @@
-# widgets_demo_app
+# EgDb Qt widgets demo app
