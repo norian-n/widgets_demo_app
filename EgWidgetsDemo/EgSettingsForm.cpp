@@ -46,14 +46,14 @@ void EgSettingsForm::on_initButton_clicked()
 
     createNodesBlueprint("layerNodesBlueprint", graphDB);
     graphDB.CreateNodesSetByBlueprint("topLayerNodes", "layerNodesBlueprint");
-    createLinksBlueprint("layerLinksBlueprint", "topLayerNodes", graphDB);
-    graphDB.CreateLinksSetByBlueprint("topLayerLinks", "layerLinksBlueprint");
+    createLinksBlueprint("layerLinksBlueprint", graphDB);
+    graphDB.CreateLinksSetByBlueprint("topLayerLinks", "layerLinksBlueprint", "topLayerNodes", "topLayerNodes");
 
     graphDB.CreateLayersSet ("demoAppLayers");
     initLayers.ConnectLayers("demoAppLayers", graphDB);
 
     EgDataNodeIDType topLayerID;
-    initLayers.createBlankLayer(topLayerID, 1000, 600, "topLayerNodes", "topLayerLinks"); // "layer1links");  // create top layer
+    initLayers.createBlankLayer(topLayerID, 0, 1111, 787, "topLayerNodes", "topLayerLinks"); // "layer1links");  // create top layer
 
     cout << "top LayerID: " << topLayerID << endl;
     initLayers.StoreLayers();
@@ -78,9 +78,9 @@ void EgSettingsForm::createNodesBlueprint(const std::string& name, EgDatabase& g
     graphDB.CommitNodeBlueprint();
 }
 
-void EgSettingsForm::createLinksBlueprint(const std::string& linksName, const std::string& nodesName, EgDatabase& graphDB)
+void EgSettingsForm::createLinksBlueprint(const std::string& linksName, EgDatabase& graphDB)
 {
-    graphDB.CreateLinkWithDataBlueprint(linksName, nodesName, nodesName);
+    graphDB.CreateLinkWithDataBlueprint(linksName);
 
     graphDB.AddLinkDataField("startPointX");
     graphDB.AddLinkDataField("startPointY");
@@ -100,8 +100,8 @@ void EgSettingsForm::initDatabase(EgDatabase& graphDB) {
     graphDB.CreateNodesSetByBlueprint("layer1nodes", "layerNodesBlueprint");
     graphDB.CreateNodesSetByBlueprint("layer2nodes", "layerNodesBlueprint");
 
-    createLinksBlueprint("layer1links", "layer1nodes", graphDB);
-    createLinksBlueprint("layer2links", "layer2nodes", graphDB);
+    createLinksBlueprint("layer1links", graphDB);
+    createLinksBlueprint("layer2links", graphDB);
 }
 
 void EgSettingsForm::addSampleDataNode(EgDataNodesSet& dataNodes, const std::string& name, int X, int Y, int H, int W) // , QList<QVariant>& addValues) {

@@ -66,8 +66,9 @@ public:
 
     int zoomFactor  {0};
 
-    int layerID    {1};
-    int maxLayerNum {2};
+    EgDataNodeIDType layerID        { 1 };
+    EgDataNodeIDType parentLayerID  { 0 };
+    // int maxLayerNum {2};
 
     egRect layerCanvas; // corner, size, egPoint/Size, origX/W, origY/H, scaledX/W, scaledY/H
     // bool showCanvasRectangle {false}; //  ==> zoomFactor
@@ -135,9 +136,7 @@ public:
 
     void LoadLayersInfo();
     void LoadLayer();
-
     void LayerUp();
-    void LayerDown();
 
     void LoadDataLinks();
     inline void ShowDataLink(EgLinkWidget* newLinkWidget);

@@ -115,9 +115,11 @@ void EgGraphWidget::clearLayer()
     if (! graphNodes) {
         cout << "clearLayer(): null nodes ptr" << endl;
     } else if (graphNodes-> isConnected) {
+        graphNodes-> Store();
         for (auto nodesIter : graphNodes-> dataMap)
         {
             EgNodeWidget* nodeWidget = static_cast<EgNodeWidget*> (nodesIter.second-> serialDataPtr);
+            cout << "clearLayer(): clear widget " << nodeWidget-> dataNodeID << endl;
             delete nodeWidget;
             nodesIter.second-> serialDataPtr = nullptr;
         }
@@ -133,6 +135,7 @@ void EgGraphWidget::clearLayer()
     if (! graphLinks) {
         cout << "clearLayer(): null links ptr" << endl;
     } else if (graphLinks-> linksDataStorage.isConnected) {
+        graphLinks->StoreLinks();
         for (auto linksIter : graphLinks-> dataMap)
         {
             EgLinkWidget* linkWidget = static_cast<EgLinkWidget*> (linksIter.second-> serialDataPtr);
@@ -299,39 +302,44 @@ inline void EgGraphWidget::adjustPointToGrid(QPoint& thePoint)
 
 void loadNodeObjectFromDb (EgDataNode& dataNode) //  pumped to dataNode.serialDataPtr
 {
-    EgNodeWidget* newNodePtr = new EgNodeWidget();
-    dataNode.serialDataPtr = (void*) newNodePtr;
+    EgNodeWidget* nodeWidgetPtr = new EgNodeWidget();
+    dataNode.serialDataPtr = (void*) nodeWidgetPtr;
 
-    newNodePtr-> dataNodeID = dataNode.dataNodeID;
+    nodeWidgetPtr-> dataNodeID = dataNode.dataNodeID;
 
-    dataNode["name"]    >> newNodePtr-> labelText;
-    dataNode["cornerX"] >> newNodePtr-> scaledCornerX;
-    dataNode["cornerY"] >> newNodePtr-> scaledCornerY;
-    dataNode["rectH"]   >> newNodePtr-> scaledRectH;
-    dataNode["rectW"]   >> newNodePtr-> scaledRectW;
+    dataNode["detailsLayerID"] >> nodeWidgetPtr-> detailsLayerID;
+    cout << "loadNodeObjectFromDb() detailsLayerID: " << nodeWidgetPtr-> detailsLayerID << endl;
 
-    newNodePtr-> origCornerX = newNodePtr-> scaledCornerX;
-    newNodePtr-> origCornerY = newNodePtr-> scaledCornerY;
-    newNodePtr-> origRectW   = newNodePtr-> scaledRectW;
-    newNodePtr-> origRectH   = newNodePtr-> scaledRectH;
+    dataNode["name"]    >> nodeWidgetPtr-> labelText;
+    dataNode["cornerX"] >> nodeWidgetPtr-> scaledCornerX;
+    dataNode["cornerY"] >> nodeWidgetPtr-> scaledCornerY;
+    dataNode["rectH"]   >> nodeWidgetPtr-> scaledRectH;
+    dataNode["rectW"]   >> nodeWidgetPtr-> scaledRectW;
+
+    nodeWidgetPtr-> origCornerX = nodeWidgetPtr-> scaledCornerX;
+    nodeWidgetPtr-> origCornerY = nodeWidgetPtr-> scaledCornerY;
+    nodeWidgetPtr-> origRectW   = nodeWidgetPtr-> scaledRectW;
+    nodeWidgetPtr-> origRectH   = nodeWidgetPtr-> scaledRectH;
     // cout << "loadNodeObjectFromDb() nodeName: " << newNodePtr-> labelText.toStdString() << endl;
 }
 
 void storeNodeObjectToDb  (EgDataNode& dataNode)
 {
-    EgNodeWidget* nodeShowtimePtr = static_cast<EgNodeWidget*> (dataNode.serialDataPtr);
+    EgNodeWidget* nodeWidgetPtr = static_cast<EgNodeWidget*> (dataNode.serialDataPtr);
 
-    dataNode["name"]    << nodeShowtimePtr-> labelText;
-    // PrintByteArray(dataNode["name"]);
-    dataNode["cornerX"] << nodeShowtimePtr-> origCornerX;
-    dataNode["cornerY"] << nodeShowtimePtr-> origCornerY;
-    dataNode["rectH"]   << nodeShowtimePtr-> origRectH;
-    dataNode["rectW"]   << nodeShowtimePtr-> origRectW;
+    dataNode["detailsLayerID"] << nodeWidgetPtr-> detailsLayerID;
+    cout << "storeNodeObjectToDb() detailsLayerID: " << nodeWidgetPtr-> detailsLayerID << endl;
 
-    nodeShowtimePtr-> scaledCornerX = nodeShowtimePtr-> origCornerX; // FIXME STUB
-    nodeShowtimePtr-> scaledCornerY = nodeShowtimePtr-> origCornerY;
-    nodeShowtimePtr-> scaledRectW = nodeShowtimePtr-> origRectW;
-    nodeShowtimePtr-> scaledRectH = nodeShowtimePtr-> origRectH;
+    dataNode["name"]    << nodeWidgetPtr-> labelText;     // PrintByteArray(dataNode["name"]);
+    dataNode["cornerX"] << nodeWidgetPtr-> origCornerX;
+    dataNode["cornerY"] << nodeWidgetPtr-> origCornerY;
+    dataNode["rectH"]   << nodeWidgetPtr-> origRectH;
+    dataNode["rectW"]   << nodeWidgetPtr-> origRectW;
+
+    nodeWidgetPtr-> scaledCornerX = nodeWidgetPtr-> origCornerX; // FIXME STUB
+    nodeWidgetPtr-> scaledCornerY = nodeWidgetPtr-> origCornerY;
+    nodeWidgetPtr-> scaledRectW = nodeWidgetPtr-> origRectW;
+    nodeWidgetPtr-> scaledRectH = nodeWidgetPtr-> origRectH;
 }
 
 void loadLinkObjectFromDb (EgDataNode& dataNode) //  pumped to dataNode.serialDataPtr
@@ -494,7 +502,7 @@ void EgGraphWidget::LoadDataNodes()
         graphNodes-> Connect(graphNodes-> nodesSetName, graphDB);
     if (! graphNodes-> isDataLoaded)
         graphNodes-> LoadAllNodes();
-    // PrintDataNodesContainer(*(graphNodes.nodesContainer));
+    // graphNodes->nodesContainer-> PrintDataNodesContainer();
     for (auto nodesIter : graphNodes-> dataMap) // 17 [first, second], <11 = dataFieldsNames.begin(); fieldsIter != dataFieldsNames.end(); ++fieldsIter) {
     // PrintEgDataNodeFields(*(nodesIter.second));
     {
@@ -529,6 +537,8 @@ void EgGraphWidget::   LoadLayer()
         return;
     }
 
+    parentLayerID = graphLayers[layerID]-> parentLayerID;
+
     layerCanvas.size.origW = graphLayers[layerID]-> layerWidth;
     layerCanvas.size.origH = graphLayers[layerID]-> layerHeight;
 
@@ -541,39 +551,8 @@ void EgGraphWidget::   LoadLayer()
     graphLayers[layerID]-> getLayerLinks(graphLinks, loadLinkObjectFromDb, storeLinkObjectToDb);
     LoadDataLinks();
 
-    /* graphLayers.getLayerNodesAndLinks(dataNodesNames, dataLinksNames, layerID);
-    for (auto nodesIter : dataNodesNames) {
-        auto findIter = dataNodesMap.find(nodesIter); // // try to find loaded nodes type
-        if (findIter == dataNodesMap.end()) {
-            graphNodes = new EgDataNodesType;
-            graphNodes-> Connect(nodesIter, graphDB);
-            graphNodes-> serialLoadFunction  = &loadNodeObjectFromDb;
-            graphNodes-> serialStoreFunction = &storeNodeObjectToDb;
-            dataNodesMap.insert(std::make_pair(nodesIter, graphNodes));
-            // cout << "LoadLayer() dataNodesMap insert: " << nodesIter << endl;
-        } else {
-            graphNodes = findIter-> second;
-            // cout << "LoadLayer() dataNodesMap found type: " << nodesIter << endl;
-        }
-        LoadDataNodes();
-    }
-    for (auto linksIter : dataLinksNames) {
-        // cout << "dataLinksNames: " << linksIter << endl;
-        auto findIterLinks = dataLinksMap.find(linksIter); // // try to find loaded nodes type
-        if (findIterLinks == dataLinksMap.end()) {
-            graphLinks = new EgLinksType;
-            graphLinks-> ConnectLinks(linksIter, graphDB);
-            graphLinks-> linksDataStorage.serialLoadFunction  = &loadLinkObjectFromDb;
-            graphLinks-> linksDataStorage.serialStoreFunction = &storeLinkObjectToDb;
-
-            dataLinksMap.insert(std::make_pair(linksIter, graphLinks));
-            // cout << "LoadLayer() dataLinksMap insert: " << linksIter << endl;
-        } else {
-            graphLinks = findIterLinks-> second;
-            // cout << "LoadLayer() dataLinksMap found type: " << linksIter << endl;
-        }
-        LoadDataLinks();
-    } */
+    QString numStr = QString::number(layerID);
+    myForm->ui->layerNumLabel-> setText(numStr);
 }
 
 void EgGraphWidget::LayerUp()
@@ -581,25 +560,12 @@ void EgGraphWidget::LayerUp()
     if (layerID > 1) {
         StoreDataNodes();
         StoreDataLinks();
-        layerID--;
+        layerID = parentLayerID; // FIXME STUB
         LoadLayer();
         QString numStr = QString::number(layerID);
         myForm->ui->layerNumLabel-> setText(numStr);
     }
     // cout << "LayerUp() : " << layerNum << endl;
-}
-
-void EgGraphWidget::LayerDown()
-{
-    if (layerID < maxLayerNum) {
-        StoreDataNodes();
-        StoreDataLinks();
-        layerID++;
-        LoadLayer();
-        QString numStr = QString::number(layerID);
-        myForm->ui->layerNumLabel-> setText(numStr);
-    }
-    // cout << "LayerDown() : " << layerNum << endl;
 }
 
 void EgGraphWidget::StoreDataNodes()
@@ -621,6 +587,8 @@ void EgGraphWidget::LoadDataLinks()
         cout << "ERROR LoadDataLinks(): null links ptr" << endl;
         return;
     }
+    if (! graphLinks-> linksDataStorage.isConnected)
+        graphLinks->ConnectLinks(graphLinks->linkNameShort, graphDB);
     if (! graphLinks-> linksDataStorage.isDataLoaded) {
         // cout << "LoadDataLinks() LoadAllNodes" << endl;
         // graphLinks-> linksDataStorage.nodesContainer-> PrintNodesChain();
@@ -823,16 +791,18 @@ void EgGraphWidget::nodeDeletePressAction()
 
 void EgGraphWidget::detailsLayerPressAction()
 {
-    // check if details layer exists
-
-    // create new details layer
-    EgDataNodeIDType newLayerID;
-    graphLayers.createDetailsLayer(dataNodeWidget->dataNodeID, newLayerID, 1000, 800, "layerNodesBlueprint", "layerLinksBlueprint");
-    cout << " detailsLayerPressAction() node ID: " << dataNodeWidget->dataNodeID << " new layer ID: " << newLayerID << endl;
-    // store parent ID
-
-    // open layer
-    layerID = newLayerID; // FIXME STUB
+    if (! dataNodeWidget-> detailsLayerID) { // check if details layer exists
+            // create new details layer
+        graphLayers.createDetailsLayer(dataNodeWidget->dataNodeID, dataNodeWidget-> detailsLayerID, layerID, 1000, 800, graphNodes->nodesSetName, "layerNodesBlueprint", "layerLinksBlueprint");
+            cout << " detailsLayerPressAction() node ID: " << dataNodeWidget->dataNodeID << " new layer ID: " << dataNodeWidget-> detailsLayerID
+                 << " parent layer ID: " << layerID << endl;
+            // store detailsLayerID and parent ID
+        graphNodes-> MarkUpdatedDataNode(dataNodeWidget->dataNodeID);
+        graphNodes-> Store();
+    }
+        // open layer
+    // parentLayerID = layerID;
+    layerID = dataNodeWidget-> detailsLayerID;
     LoadLayer();
 }
 
@@ -857,7 +827,6 @@ void EgGraphWidget::mousePressEvent(QMouseEvent *event)
     }
 
     if (actionMode == detailsLayerMode) {
-
         detailsLayerPressAction();
         return;
     }

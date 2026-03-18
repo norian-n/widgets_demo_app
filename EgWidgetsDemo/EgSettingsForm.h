@@ -22,7 +22,7 @@ public:
     ~EgSettingsForm();
 
     void createNodesBlueprint(const std::string& name, EgDatabase& graphDB);
-    void createLinksBlueprint(const std::string& linksName, const std::string& nodesName, EgDatabase& graphDB);
+    void createLinksBlueprint(const std::string& linksName, EgDatabase& graphDB);
 
     void initDatabase(EgDatabase& graphDB);
     void addSampleDataNode(EgDataNodesSet& dataNodes, const std::string& name, int X, int Y, int H, int W);

@@ -157,10 +157,10 @@ void EgGraphForm::on_deleteModeButton_clicked()
 
 void EgGraphForm::on_lvlUpButton_clicked()
 {
-    clearButtons();
+    // clearButtons();
     GraphWidget-> LayerUp();
-    GraphWidget-> actionMode = moveMode;
-    ui->moveModeButton-> setStyleSheet("background-color: lightgreen;");
+    // GraphWidget-> actionMode = moveMode;
+    // ui->moveModeButton-> setStyleSheet("background-color: lightgreen;");
 }
 
 
