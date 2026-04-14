@@ -30,32 +30,32 @@ void EgSettingsForm::on_initButton_clicked()
     // std::filesystem::path currentPath = std::filesystem::current_path();
     // std::cout << "Current path: " << currentPath << std::endl;
 
-    // delete all data and blueprint files
-    namespace fs = std::filesystem;
-    for (const auto& entry : fs::directory_iterator(fs::current_path())) { // iterate all files
-        std::cout << "File ext: " << entry.path().extension() << std::endl;
+    namespace fs = std::filesystem;     // delete all data and blueprint files
+    for (const auto& entry : fs::directory_iterator("egdb")) {// fs::current_path())) { // iterate all files
+        // std::cout << "File ext: " << entry.path().extension() << std::endl;
         if (fs::is_regular_file(entry.status()) && ( entry.path().extension() == ".dnl" || entry.path().extension() == ".gdn" )) {
             fs::remove(entry.path()); // Delete the file
-            std::cout << "Deleted: " << entry.path().filename() << std::endl;
+            // std::cout << "Deleted: " << entry.path().filename() << std::endl;
         }
     }
+    // fs::remove("egdb");
 
     cout << "===== Init sample data " << " =====" << endl;
     EgDatabase graphDB;
     EgLayers   initLayers;
 
     createNodesBlueprint("layerNodesBlueprint", graphDB);
-    graphDB.CreateNodesSetByBlueprint("topLayerNodes", "layerNodesBlueprint");
+    graphDB.CreateNodesSetByBlueprint("layerNodes", "layerNodesBlueprint");
     createLinksBlueprint("layerLinksBlueprint", graphDB);
-    graphDB.CreateLinksSetByBlueprint("topLayerLinks", "layerLinksBlueprint", "topLayerNodes", "topLayerNodes");
+    graphDB.CreateLinksSetByBlueprint("layerLinks", "layerLinksBlueprint", "layerNodes", "layerNodes");
 
     graphDB.CreateLayersSet ("demoAppLayers");
     initLayers.ConnectLayers("demoAppLayers", graphDB);
 
     EgDataNodeIDType topLayerID;
-    initLayers.createBlankLayer(topLayerID, 0, 1111, 787, "topLayerNodes", "topLayerLinks"); // "layer1links");  // create top layer
+    initLayers.createBlankLayer(topLayerID, 0, defaultCanvasW, defaultCanvasH, "layerNodes", "layerLinks");  // create top layer
 
-    cout << "top LayerID: " << topLayerID << endl;
+    // cout << "top LayerID: " << topLayerID << endl;
     initLayers.StoreLayers();
 
     cout << "===== Init complete =====" << endl;
@@ -69,11 +69,15 @@ void EgSettingsForm::createNodesBlueprint(const std::string& name, EgDatabase& g
     graphDB.CreateNodeBlueprint(name);
 
     graphDB.AddNodeDataField("name");
+    graphDB.AddNodeDataField("description");
+
     graphDB.AddNodeDataField("cornerX");
     graphDB.AddNodeDataField("cornerY");
     graphDB.AddNodeDataField("rectH");
     graphDB.AddNodeDataField("rectW");
     graphDB.AddNodeDataField("detailsLayerID");
+    graphDB.AddNodeDataField("fillColor");
+    graphDB.AddNodeDataField("image");
 
     graphDB.CommitNodeBlueprint();
 }
@@ -88,6 +92,8 @@ void EgSettingsForm::createLinksBlueprint(const std::string& linksName, EgDataba
     graphDB.AddLinkDataField("endPointY");
     graphDB.AddLinkDataField("portFrom"); // portSideFrom
     graphDB.AddLinkDataField("portTo");   // portSideTo
+    graphDB.AddLinkDataField("sideCoordFrom");
+    graphDB.AddLinkDataField("sideCoordTo");
     graphDB.AddLinkDataField("lineType");
 
     graphDB.CommitLinkBlueprint();

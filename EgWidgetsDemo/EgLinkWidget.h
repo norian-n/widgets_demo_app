@@ -4,7 +4,7 @@
 #include <QWidget>
 #include <QDrag>
 
-// #include "egNodeToSpace.h"
+#include "qtinterface/egQtInterface.h"
 
 const int directConnect     {0};
 const int sideConnect       {1};
@@ -30,19 +30,20 @@ public:
     int nodeIDFrom      {0};
     int nodeIDTo        {0};
 
+    EgNodeWidget* nodeWidgetFrom {nullptr}; // for edit drag
+    EgNodeWidget* nodeWidgetTo   {nullptr};
+
     int portSideFrom    {0};
-    QPoint startPointOrig;
-    QPoint startPointScaled;
-
     int portSideTo      {0};
-    QPoint endPointOrig;
-    QPoint endPointScaled;
 
-    int scaledCornerX {0};    // top right corner
-    int scaledCornerY {0};
+    int sideCoordFromOrig   {0};
+    int sideCoordFromScaled {0};
+    int sideCoordToOrig     {0};
+    int sideCoordToScaled   {0};
 
-    int scaledRectW {100};    // rectangle width
-    int scaledRectH {100};    // rectangle height
+    egRect linkRect;
+    egPoint linkPointStart;
+    egPoint linkPointEnd;
 
     int lineType  {directConnect};
 
@@ -50,38 +51,31 @@ public:
     bool useXforDrag        {true};
     bool editLinkIsOutLink  {true};
 
-    int minCoordForDrag     {0};
-    int maxCoordForDrag     {1000};
+    QPoint dragStart;
+    QByteArray* itemData    {nullptr};
+    // int minCoordForDrag     {0};
+    // int maxCoordForDrag     {1000}; // FIXME STUB
 
-    int tmpLinkQuadrant {0};
+    // int tmpLinkQuadrant {0};
     QPoint startPoint;
     QPoint endPoint;
     QPoint midPoint;
-
-    QPoint dragStart;
-    QByteArray* itemData    {nullptr};
 
     qreal arrowLength   {20};
 
     EgLinkWidget(QWidget *parent = 0);
     ~EgLinkWidget();
 
-    inline void adjustToGridX(int& coordX);
-    inline void adjustToGridY(int& coordY);
-    inline void adjustGlobPointsToWidget();  // convert to insde widget coords
+    // void alignToGrid(int& coord);
+
+    inline void convertGlobPointsToWidget();  // convert to insde widget coords
 
     void drawArrow(QPoint start, QPoint end);
     void drawDirAngleLink(QPoint start, QPoint mid, QPoint end);
     void drawThreeFoldSide(QPoint start, QPoint end, int delta);
     void drawThreeFoldTop(QPoint start, QPoint end, int delta);
 
-    void calcLinkWidgetRect(int zoomFactor);
-
-    void calcOrigToScaled      (int zoomFactor, QPoint& globCanvasScaled);
-    void calcOrigToScaledStart (int zoomFactor, QPoint& globCanvasScaled);
-    void calcOrigToScaledEnd   (int zoomFactor, QPoint& globCanvasScaled);
-    void calcScaledToOrigStart (int zoomFactor, QPoint& globCanvasScaled);
-    void calcScaledToOrigEnd   (int zoomFactor, QPoint& globCanvasScaled);
+    void calcLinkWidgetRect(int zoomFactor, int globalIndentScaled);
 
     void updLinkAftMoveStart(QPoint& deltaStartPoint);
     void updLinkAftMoveEnd  (QPoint& deltaEndPoint);

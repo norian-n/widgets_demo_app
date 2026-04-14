@@ -14,102 +14,28 @@
    <string>EgGraphForm</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <widget class="QGroupBox" name="groupBox">
+   <widget class="QFrame" name="frame">
     <property name="geometry">
      <rect>
-      <x>20</x>
-      <y>550</y>
-      <width>320</width>
-      <height>51</height>
+      <x>790</x>
+      <y>80</y>
+      <width>98</width>
+      <height>215</height>
      </rect>
     </property>
     <property name="sizePolicy">
-     <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+     <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
       <horstretch>0</horstretch>
       <verstretch>0</verstretch>
      </sizepolicy>
     </property>
-    <property name="minimumSize">
-     <size>
-      <width>320</width>
-      <height>0</height>
-     </size>
+    <property name="frameShadow">
+     <enum>QFrame::Plain</enum>
     </property>
-    <property name="acceptDrops">
-     <bool>false</bool>
+    <property name="lineWidth">
+     <number>0</number>
     </property>
-    <property name="title">
-     <string/>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignBottom|Qt::AlignLeading|Qt::AlignLeft</set>
-    </property>
-    <layout class="QHBoxLayout" name="horizontalLayout_2">
-     <item>
-      <widget class="QPushButton" name="settingsButton">
-       <property name="text">
-        <string>Settings</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="lvlUpButton">
-       <property name="text">
-        <string>Lvl Up</string>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QLabel" name="layerNumLabel">
-       <property name="minimumSize">
-        <size>
-         <width>30</width>
-         <height>0</height>
-        </size>
-       </property>
-       <property name="font">
-        <font>
-         <pointsize>16</pointsize>
-        </font>
-       </property>
-       <property name="text">
-        <string>1</string>
-       </property>
-       <property name="alignment">
-        <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-       </property>
-      </widget>
-     </item>
-    </layout>
-   </widget>
-   <widget class="QGroupBox" name="groupBox_2">
-    <property name="geometry">
-     <rect>
-      <x>410</x>
-      <y>550</y>
-      <width>541</width>
-      <height>48</height>
-     </rect>
-    </property>
-    <property name="sizePolicy">
-     <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
-      <horstretch>0</horstretch>
-      <verstretch>0</verstretch>
-     </sizepolicy>
-    </property>
-    <property name="minimumSize">
-     <size>
-      <width>280</width>
-      <height>0</height>
-     </size>
-    </property>
-    <property name="title">
-     <string/>
-    </property>
-    <property name="alignment">
-     <set>Qt::AlignCenter</set>
-    </property>
-    <layout class="QHBoxLayout" name="horizontalLayout">
+    <layout class="QVBoxLayout" name="verticalLayout">
      <item>
       <widget class="QPushButton" name="moveModeButton">
        <property name="text">
@@ -136,13 +62,6 @@
        </property>
        <property name="flat">
         <bool>false</bool>
-       </property>
-      </widget>
-     </item>
-     <item>
-      <widget class="QPushButton" name="detailsButton">
-       <property name="text">
-        <string>Details</string>
        </property>
       </widget>
      </item>
@@ -187,6 +106,48 @@
        </property>
        <property name="flat">
         <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <widget class="QPushButton" name="openTableButton">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="minimumSize">
+        <size>
+         <width>0</width>
+         <height>0</height>
+        </size>
+       </property>
+       <property name="text">
+        <string>Table</string>
+       </property>
+       <property name="flat">
+        <bool>false</bool>
+       </property>
+      </widget>
+     </item>
+     <item>
+      <spacer name="verticalSpacer">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>17</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="settingsButton">
+       <property name="text">
+        <string>Settings</string>
        </property>
       </widget>
      </item>

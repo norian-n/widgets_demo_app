@@ -3,7 +3,7 @@
 
 #include <QWidget>
 
-#include "nodes/egDataNodesSet.h"
+#include "qtinterface/egQtInterface.h"
 
 const int portPointsCount {4};
 const int portRectSize {10};
@@ -13,33 +13,35 @@ class EgNodeWidget : public QWidget
     Q_OBJECT
 
 public:
-    QPainter* nodePainter  {nullptr};
+    QPainter* nodePainter   {nullptr};
+    QPixmap*  pixmap        {nullptr};
+
+    QString labelText       {"New node"};
+    QString descText        {""};
+    QColor  fillColor       {Qt::lightGray};
+
     EgDataNodeIDType dataNodeID     {0};
     EgDataNodeIDType detailsLayerID {0};
-    QString labelText      {"New node"};
+
     bool nodeFormOkFlag    {false};
 
     bool nodeResizeMode    {false};
-    bool nodeShowCorner    {false};
+    // bool nodeShowCorner    {false};
     bool nodeDeleteMode    {false};
 
-    int origCornerX        {0};
-    int origCornerY        {0};
-    int origRectW          {100};
-    int origRectH          {100};
+    int  zoomFactor {0};
+    int  actionMode {0};
 
-    int scaledCornerX      {0};    // top right corner
-    int scaledCornerY      {0};
-    int scaledRectW        {100};    // rectangle width
-    int scaledRectH        {100};    // rectangle height
+    egRect nodeRect;
 
     EgNodeWidget(QWidget *parent = 0);
     ~EgNodeWidget();
 
-    void calcPortPoint(int& portSide, QPoint& clickPoint, QPoint& portPoint);
+    void alignToGrid(int& coord);
 
-    void calcOrigToScaled(int zoomFactor, QPoint& globCanvasScaled);
-    void calcScaledToOrig(int zoomFactor, QPoint& globCanvasScaled);
+    void calcPortPointScaled(int& portSide, QPoint& clickPoint, QPoint& portPoint, int& sideCoord);
+    void calcPortPointOrig(QPoint& clickPointScaled, int zoomFactor, int& portSide, int& sideCoordOrig, int& pointOrigX, int& pointOrigY);
+    void getLinkPointOrig(int portSide, int sideCoordOrig, int& pointOrigX, int& pointOrigY);
 
 protected:
     void paintEvent(QPaintEvent *event) override;

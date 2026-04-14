@@ -6,6 +6,9 @@
 
 #include "metainfo/egDatabase.h"
 
+const int defaultCanvasW   {600};
+const int defaultCanvasH   {400};
+
 namespace Ui {
 class EgSettingsForm;
 }

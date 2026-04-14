@@ -10,11 +10,10 @@
 #include <QMouseEvent>
 #include <QMimeData>
 
-#include <iostream>
 using namespace std;
 
 EgLinkWidget::EgLinkWidget(QWidget *parent):  QWidget(parent)
-    , itemData (new QByteArray) , linkPainter (new QPainter())
+    ,linkPainter (new QPainter()), itemData (new QByteArray)
 {
     setMouseTracking(true);
     // cout << "EgLinkWidget() linkInfo: " << std::hex << (int64_t) linkInfo << std::dec << endl;
@@ -23,18 +22,21 @@ EgLinkWidget::EgLinkWidget(QWidget *parent):  QWidget(parent)
 EgLinkWidget::~EgLinkWidget()
 {
     delete linkPainter;
+    delete itemData;
 }
 
 void EgLinkWidget::drawArrow(QPoint start, QPoint end)
 {
-    QLineF line(end, start);
-    linkPainter-> drawLine(line);
+    linkPainter-> drawLine(end, start);
 
+    const qreal minArrowLength {5.0};
+
+    QLineF line(end, start); // draw arrow by float-point calc
     arrowLength = std::min<qreal> ((qreal)line.length()/2, dynamic_cast<EgGraphWidget*> (parent())-> scaledArrowLength);
 
-    if (arrowLength < 5) return; // too short
+    if (arrowLength < minArrowLength) return; // too short
 
-    qreal arroHalfWidth = arrowLength / 5;
+    qreal arroHalfWidth = arrowLength / minArrowLength;
 
     linkPainter-> setBrush(linkPainter-> pen().color());
 
@@ -77,7 +79,6 @@ void EgLinkWidget::drawThreeFoldSide(QPoint start, QPoint end, int delta)
     drawArrow(QPoint(centerX, end.y()), QPoint(end.x(), end.y()));    // last segment - arrow
 }
 
-
 void EgLinkWidget::drawThreeFoldTop(QPoint start, QPoint end, int delta)
 {
     // center line x
@@ -93,28 +94,32 @@ void EgLinkWidget::drawThreeFoldTop(QPoint start, QPoint end, int delta)
     drawArrow(QPoint(end.x(), centerY), QPoint(end.x(), end.y()));    // last segment - arrow
 }
 
-inline void EgLinkWidget::adjustGlobPointsToWidget()
+inline void EgLinkWidget::convertGlobPointsToWidget()
 {
     QPoint cornerPoint(this->x(), this->y());
-    startPoint = startPointScaled - cornerPoint;
-    endPoint   = endPointScaled   - cornerPoint;
+    startPoint = QPoint(linkPointStart.scaledX, linkPointStart.scaledY) - cornerPoint;
+    endPoint   = QPoint(linkPointEnd.scaledX, linkPointEnd.scaledY) - cornerPoint;
 }
 
 void EgLinkWidget::paintEvent(QPaintEvent *)
 {
     linkPainter-> begin(this);
 
-    adjustGlobPointsToWidget();
+    convertGlobPointsToWidget();
 
     if (isEditSelected) {
-        raise();
-        QPen linkPen;
-        linkPen.setWidth(2);
-        linkPen.setColor(QColor(0,172,20,255));
-        linkPainter-> setPen(linkPen);
+
+        linkPainter-> setPen(QColor(0,20,172,255)); // frame
+        linkPainter-> drawRect(0,0,width()-1, height()-1);
+
+        // QPen linkPen;
+        // linkPen.setWidth(2);
+        // linkPen.setColor(QColor(0,172,20,255));
+        linkPainter-> setPen(Qt::red);
         // linkPainter-> setPen(QColor(0,172,20,255));
     } else
-        linkPainter-> setPen(QColor(255, 30, 30, 255)); // (0,20,172,255));    
+        // linkPainter-> setPen(QColor(255, 30, 30, 255)); // (0,20,172,255));
+        linkPainter-> setPen(Qt::darkBlue); // (0,20,172,255));
 
     int delta = static_cast<EgGraphWidget*> (parent())-> scaledGlobalIndent / 2;
 
@@ -141,9 +146,10 @@ void EgLinkWidget::paintEvent(QPaintEvent *)
         drawDirAngleLink(startPoint, midPoint, endPoint);
     }
 
-    if (isEditSelected) {
+    if (isEditSelected) { // draw edit knob rectangle
         linkPainter-> setPen(Qt::NoPen);
-        linkPainter-> setBrush(QBrush(QColor(31, 255, 31, 255)));
+        // linkPainter-> setBrush(QBrush(QColor(31, 255, 31, 255)));
+        linkPainter-> setBrush(QBrush(Qt::red));
         if (editLinkIsOutLink)
             linkPainter-> drawRect(startPoint.x()-portRectSize/2, startPoint.y()-portRectSize/2, portRectSize, portRectSize);
         else
@@ -158,6 +164,10 @@ void EgLinkWidget::paintEvent(QPaintEvent *)
 void EgLinkWidget::mousePressEvent(QMouseEvent *event)
 {
     if (isEditSelected) {
+
+        nodeWidgetFrom = static_cast<EgNodeWidget*> ((*(static_cast<EgGraphWidget*> (parent())-> graphNodes))[nodeIDFrom].serialDataPtr);
+        nodeWidgetTo   = static_cast<EgNodeWidget*>    ((*(static_cast<EgGraphWidget*> (parent())-> graphNodes))[nodeIDTo].serialDataPtr);
+
         if (editLinkIsOutLink)
             useXforDrag = (portSideFrom == portSideNorth || portSideFrom == portSideSouth); // check what side to drag
         else
@@ -166,23 +176,27 @@ void EgLinkWidget::mousePressEvent(QMouseEvent *event)
         setAcceptDrops(true);
 
         QDrag* drag = new QDrag(this);
-        dragStart   = event->position().toPoint();
+        // dragStart   = event->position().toPoint();
 
-        itemData-> clear();
+        /*itemData-> clear();
         QDataStream dataStream(itemData, QIODevice::WriteOnly);
-        dataStream << dragStart;
+        dataStream << dragStart;*/
 
         QMimeData *mimeData = new QMimeData;
-        mimeData->clear();
+        // mimeData->clear();
         mimeData->setData("application/x-dnditemdata", *itemData);
         drag-> setMimeData(mimeData);
-
-        static_cast<EgGraphWidget*> (parent())-> graphLinks-> linksDataStorage.MarkUpdatedDataNode(dataLinkID);
 
         static_cast<EgGraphWidget*> (parent())-> myForm-> dragDropAction = true;
         drag-> exec(Qt::MoveAction);
         static_cast<EgGraphWidget*> (parent())-> myForm-> dragDropAction = false;
-    }
+
+        static_cast<EgGraphWidget*> (parent())-> graphLinks-> linksDataStorage.MarkUpdatedDataNode(dataLinkID);
+
+        // FIXME resize widget to move arrow
+
+    } else
+        event->ignore();
 }
 
 void EgLinkWidget::dragEnterEvent(QDragEnterEvent *event)
@@ -197,164 +211,89 @@ void EgLinkWidget::dragEnterEvent(QDragEnterEvent *event)
 void EgLinkWidget::dragMoveEvent(QDragMoveEvent *event)
 {
     // cout << "link dragMoveEvent() pos+y(): " << event-> position().toPoint().y() + y() << endl;
-    if (editLinkIsOutLink)
-    {
-        if (useXforDrag)
-        {
-            if (event-> position().toPoint().x() + x() <= maxCoordForDrag && event-> position().toPoint().x() + x() >= minCoordForDrag)
-                startPointScaled.setX(event-> position().toPoint().x() + x());
-            else
-                if (event-> position().toPoint().x() + x() > maxCoordForDrag)
-                    startPointScaled.setX(maxCoordForDrag);
-                else
-                    startPointScaled.setX(minCoordForDrag);
+    int globalCoordScaled;
+    int nodeCoordScaled;
+
+    if (useXforDrag) {
+        globalCoordScaled = event-> position().toPoint().x() + x();
+        if (editLinkIsOutLink) {
+            nodeCoordScaled = globalCoordScaled - nodeWidgetFrom-> x();
+            if (nodeCoordScaled > nodeWidgetFrom-> width() - 1)
+                nodeCoordScaled = nodeWidgetFrom-> width() - 1;
         } else {
-            if (event-> position().toPoint().y() + y() <= maxCoordForDrag && event-> position().toPoint().y() + y() >= minCoordForDrag)
-                startPointScaled.setY(event-> position().toPoint().y() + y());
-            else
-                if (event-> position().toPoint().y() + y() > maxCoordForDrag)
-                    startPointScaled.setY(maxCoordForDrag);
-                else
-                    startPointScaled.setY(minCoordForDrag);
+            nodeCoordScaled = globalCoordScaled - nodeWidgetTo-> x();
+            if (nodeCoordScaled > nodeWidgetTo-> width() - 1)
+                nodeCoordScaled = nodeWidgetTo-> width() - 1;
         }
     } else {
-        if (useXforDrag)
-        {
-            if (event-> position().toPoint().x() + x() <= maxCoordForDrag && event-> position().toPoint().x() + x() >= minCoordForDrag)
-                endPointScaled.setX(event-> position().toPoint().x() + x());
-            else
-                if (event-> position().toPoint().x() + x() > maxCoordForDrag)
-                    endPointScaled.setX(maxCoordForDrag);
-                else
-                    endPointScaled.setX(minCoordForDrag);
+        globalCoordScaled = event-> position().toPoint().y() + y();
+        if (editLinkIsOutLink) {
+            nodeCoordScaled = globalCoordScaled - nodeWidgetFrom-> y();
+            if (nodeCoordScaled > nodeWidgetFrom-> height() - 1)
+                nodeCoordScaled = nodeWidgetFrom-> height() - 1;
         } else {
-            if (event-> position().toPoint().y() + y() <= maxCoordForDrag && event-> position().toPoint().y() + y() >= minCoordForDrag)
-                endPointScaled.setY(event-> position().toPoint().y() + y());
-            else
-                if (event-> position().toPoint().y() + y() > maxCoordForDrag)
-                    endPointScaled.setY(maxCoordForDrag);
-                else
-                    endPointScaled.setY(minCoordForDrag);
+            nodeCoordScaled = globalCoordScaled - nodeWidgetTo-> y();
+            if (nodeCoordScaled > nodeWidgetTo-> height() - 1)
+                nodeCoordScaled = nodeWidgetTo-> height() - 1;
         }
     }
-
-     // ajust point to the grid
-    if (editLinkIsOutLink)
-    {
-        if (portSideTo == portSideNorth || portSideTo == portSideNorth) {
-            int tmpX =  endPointOrig.x();
-            adjustToGridX (tmpX);
-            endPointOrig.setX(tmpX);
-        } else {
-            int tmpY =  endPointOrig.y();
-            adjustToGridY (tmpY);
-            endPointOrig.setY(tmpY);
-        }
-    } else {
-        if (portSideTo == portSideNorth || portSideTo == portSideNorth) {
-            int tmpX =  endPointOrig.x();
-            adjustToGridX (tmpX);
-            endPointOrig.setX(tmpX);
-        } else {
-            int tmpY =  endPointOrig.y();
-            adjustToGridY (tmpY);
-            endPointOrig.setY(tmpY);
-        }
-    }
-
-    calcLinkWidgetRect(static_cast<EgGraphWidget*> (parent())-> zoomFactor);
-    static_cast<EgGraphWidget*> (parent())-> moveResizeLinkWidget(this);
 
     if (editLinkIsOutLink) {
-        QPoint tmpPoint { static_cast<EgGraphWidget*> (parent())-> layerCanvas.corner.scaledX, static_cast<EgGraphWidget*> (parent())-> layerCanvas.corner.scaledY }; // FIXME STUB
-        calcScaledToOrigStart(static_cast<EgGraphWidget*> (parent())-> zoomFactor, tmpPoint);
+        scaledToOrigScalar(nodeCoordScaled, sideCoordFromOrig, static_cast<EgGraphWidget*> (parent())-> zoomFactor);
+        alignToGrid(sideCoordFromOrig, gridSizeOrig, 0);
+        nodeWidgetFrom-> getLinkPointOrig(portSideFrom, sideCoordFromOrig, linkPointStart.origX, linkPointStart.origY);
+        origToScaledPointCanvas(linkPointStart, static_cast<EgGraphWidget*> (parent())-> zoomFactor, static_cast<EgGraphWidget*> (parent())-> layerCanvas.corner);
     } else {
-        QPoint tmpPoint { static_cast<EgGraphWidget*> (parent())-> layerCanvas.corner.scaledX, static_cast<EgGraphWidget*> (parent())-> layerCanvas.corner.scaledY }; // FIXME STUB
-        calcScaledToOrigEnd(static_cast<EgGraphWidget*> (parent())-> zoomFactor, tmpPoint);
+        scaledToOrigScalar(nodeCoordScaled, sideCoordToOrig, static_cast<EgGraphWidget*> (parent())-> zoomFactor);
+        alignToGrid(sideCoordToOrig, gridSizeOrig, 0);
+        nodeWidgetTo-> getLinkPointOrig(portSideTo, sideCoordToOrig, linkPointEnd.origX, linkPointEnd.origY);
+        origToScaledPointCanvas(linkPointEnd, static_cast<EgGraphWidget*> (parent())-> zoomFactor, static_cast<EgGraphWidget*> (parent())-> layerCanvas.corner);
     }
+
+    static_cast<EgGraphWidget*> (parent())-> graphLinks-> MarkUpdatedLink(dataLinkID);
+    repaint();
+    // cout << "link dragMoveEvent() dataLinkID: " << dec << dataLinkID << endl;
 }
 
-inline void EgLinkWidget::adjustToGridX(int& coordX)
+/*
+void EgLinkWidget::alignToGrid(int& coord)
 {
-    if (coordX < globalIndentOrig)
-        coordX = globalIndentOrig;
-    int modulo = coordX % gridSizeOrig;
+    if (coord < globalIndentOrig)
+        coord = globalIndentOrig;
+    int modulo = coord % gridSizeOrig;
     if (! modulo)
         return;
     if (modulo < gridSizeOrig/2)
-        coordX -= modulo;
+        coord -= modulo;
     else
-        coordX += gridSizeOrig-modulo;
-    cout << "adjustToGridX() modulo: " << dec << modulo << " coordX: " << coordX << endl;
-}
+        coord += gridSizeOrig-modulo;
+    // cout << "alignToGrid() modulo: " << dec << modulo << " coord: " << coord << endl;
+} */
 
-inline void EgLinkWidget::adjustToGridY(int& coordY)
+void EgLinkWidget::calcLinkWidgetRect(int zoomFactor, int globalIndentScaled)
 {
-    if (coordY < globalIndentOrig)
-        coordY = globalIndentOrig;
-    int modulo = coordY % gridSizeOrig;
-    if (! modulo)
-        return;
-    if (modulo < gridSizeOrig/2)
-        coordY -= modulo;
-    else
-        coordY += gridSizeOrig-modulo;
-    cout << "adjustToGridX() modulo: " << dec << modulo << " coordY: " << coordY << endl;
-}
+    linkRect.corner.scaledX = std::min<int> (linkPointStart.scaledX, linkPointEnd.scaledX) - globalIndentScaled;
+    linkRect.corner.scaledY = std::min<int> (linkPointStart.scaledY, linkPointEnd.scaledY) - globalIndentScaled;
+    int maxScaledX = std::max<int> (linkPointStart.scaledX, linkPointEnd.scaledX);
+    int maxScaledY = std::max<int> (linkPointStart.scaledY, linkPointEnd.scaledY);
 
-void EgLinkWidget::calcLinkWidgetRect(int zoomFactor)
-{
-    int globalIndent = globalIndentOrig * (10 - zoomFactor)/10;
-
-    scaledCornerX = std::min<int> (startPointScaled.x(), endPointScaled.x()) - globalIndent;
-    int maxScaledX = std::max<int> (startPointScaled.x(), endPointScaled.x()) + globalIndent;
-    scaledCornerY = std::min<int> (startPointScaled.y(), endPointScaled.y()) - globalIndent;
-    int maxScaledY = std::max<int> (startPointScaled.y(), endPointScaled.y()) + globalIndent;
-
-    scaledRectW = maxScaledX - scaledCornerX;
-    scaledRectH = maxScaledY - scaledCornerY;
+    linkRect.size.scaledW = maxScaledX - linkRect.corner.scaledX + globalIndentScaled * 2;
+    linkRect.size.scaledH = maxScaledY - linkRect.corner.scaledY + globalIndentScaled * 2;
     // cout << "calcLinkWidgetRect() "  << cornerX << " : " << maxScaledX << " : " << cornerY << " : " << maxScaledY << endl;
-}
 
-void EgLinkWidget::calcOrigToScaled(int zoomFactor, QPoint& globCanvasScaled)
-{
-    calcOrigToScaledStart(zoomFactor, globCanvasScaled);
-    calcOrigToScaledEnd(zoomFactor, globCanvasScaled);
-}
-
-void EgLinkWidget::calcOrigToScaledStart(int zoomFactor, QPoint& globCanvasScaled)
-{
-    startPointScaled.setX(startPointOrig.x() * (10 - zoomFactor)/10 + globCanvasScaled.x());
-    startPointScaled.setY(startPointOrig.y() * (10 - zoomFactor)/10 + globCanvasScaled.y());
-}
-
-void EgLinkWidget::calcOrigToScaledEnd(int zoomFactor, QPoint& globCanvasScaled)
-{
-    endPointScaled.setX  (endPointOrig.x() * (10 - zoomFactor)/10 + globCanvasScaled.x());
-    endPointScaled.setY  (endPointOrig.y() * (10 - zoomFactor)/10 + globCanvasScaled.y());
-}
-
-
-void EgLinkWidget::calcScaledToOrigStart(int zoomFactor, QPoint& globCanvasScaled)
-{
-    startPointOrig.setX((startPointScaled.x() - globCanvasScaled.x()) * 10/(10 - zoomFactor));
-    startPointOrig.setY((startPointScaled.y() - globCanvasScaled.y()) * 10/(10 - zoomFactor));
-}
-
-void EgLinkWidget::calcScaledToOrigEnd(int zoomFactor, QPoint& globCanvasScaled)
-{
-    endPointOrig.setX((endPointScaled.x() - globCanvasScaled.x()) * 10/(10 - zoomFactor));
-    endPointOrig.setY((endPointScaled.y() - globCanvasScaled.y()) * 10/(10 - zoomFactor));
+    // scaledToOrigRectCanvas   (egRect& rect, int zoomFactor, egPoint& canvas); // FIXME check
 }
 
 void EgLinkWidget::updLinkAftMoveStart(QPoint& deltaStartPoint)
 {
-    startPointScaled += deltaStartPoint;
+    linkPointStart.scaledX += deltaStartPoint.x();
+    linkPointStart.scaledY += deltaStartPoint.y();
 }
 
 void EgLinkWidget::updLinkAftMoveEnd(QPoint& deltaEndPoint)
 {
-    endPointScaled += deltaEndPoint;
+    linkPointEnd.scaledX += deltaEndPoint.x();
+    linkPointEnd.scaledY += deltaEndPoint.y();
 }
 
 void EgLinkWidget::updLinkAftResizeStart(EgNodeWidget* nodeData, int oldW, int oldH)
@@ -363,26 +302,26 @@ void EgLinkWidget::updLinkAftResizeStart(EgNodeWidget* nodeData, int oldW, int o
     int newOffset;
     switch (portSideFrom) {
     case portSideNorth:
-        oldOffset = startPointOrig.x() - nodeData->origCornerX;
-        newOffset = oldOffset * nodeData->origRectW / oldW;
-        startPointOrig.setX(nodeData->origCornerX + newOffset);
+        oldOffset = linkPointStart.origX - nodeData->nodeRect.corner.origX; // origCornerX;
+        newOffset = oldOffset * nodeData->nodeRect.size.origW /*origRectW*/ / oldW;
+        linkPointStart.origX = (nodeData->nodeRect.corner.origX /*origCornerX*/ + newOffset);
         break;
     case portSideEast:
-        oldOffset = startPointOrig.y() - nodeData->origCornerY;
-        newOffset = oldOffset * nodeData->origRectH / oldH;
-        startPointOrig.setY(nodeData->origCornerY + newOffset);
-        startPointOrig.setX(nodeData->origCornerX + nodeData->origRectW - 1);
+        oldOffset = linkPointStart.origY - nodeData->nodeRect.corner.origY;
+        newOffset = oldOffset * nodeData->nodeRect.size.origH / oldH;
+        linkPointStart.origY = (nodeData->nodeRect.corner.origY + newOffset);
+        linkPointStart.origX = (nodeData->nodeRect.corner.origX + nodeData->nodeRect.size.origW - 1);
         break;
     case portSideSouth:
-        oldOffset = startPointOrig.x() - nodeData->origCornerX;
-        newOffset = oldOffset * nodeData->origRectW / oldW;
-        startPointOrig.setX(nodeData->origCornerX + newOffset);
-        startPointOrig.setY(nodeData->origCornerY + nodeData->origRectH - 1);
+        oldOffset = linkPointStart.origY - nodeData->nodeRect.corner.origX;
+        newOffset = oldOffset * nodeData->nodeRect.size.origW / oldW;
+        linkPointStart.origX = (nodeData->nodeRect.corner.origX + newOffset);
+        linkPointStart.origY = (nodeData->nodeRect.corner.origY + nodeData->nodeRect.size.origH - 1);
         break;
     case portSideWest:
-        oldOffset = startPointOrig.y() - nodeData->origCornerY;
-        newOffset = oldOffset * nodeData->origRectH / oldH;
-        startPointOrig.setY(nodeData->origCornerY + newOffset);
+        oldOffset = linkPointStart.origY - nodeData->nodeRect.corner.origY;
+        newOffset = oldOffset * nodeData->nodeRect.size.origH / oldH;
+        linkPointStart.origY = (nodeData->nodeRect.corner.origY + newOffset);
         break;
     }
     // cout << "updLinkAftResizeStart(): " << oldW << " : " << newW << " : " << oldH << " : " << newH << endl;
@@ -394,26 +333,26 @@ void EgLinkWidget::updLinkAftResizeEnd(EgNodeWidget* nodeData, int oldW, int old
     int newOffset;
     switch (portSideTo) {
     case portSideNorth:
-        oldOffset = endPointOrig.x() - nodeData->origCornerX;
-        newOffset = oldOffset * nodeData->origRectW / oldW;
-        endPointOrig.setX(nodeData->origCornerX + newOffset);
+        oldOffset = linkPointEnd.origX - nodeData->nodeRect.corner.origX;
+        newOffset = oldOffset * nodeData->nodeRect.size.origW / oldW;
+        linkPointEnd.origX = (nodeData->nodeRect.corner.origX + newOffset);
         break;
     case portSideEast:
-        oldOffset = endPointOrig.y() - nodeData->origCornerY;
-        newOffset = oldOffset * nodeData->origRectH / oldH;
-        endPointOrig.setY(nodeData->origCornerY + newOffset);
-        endPointOrig.setX(nodeData->origCornerX + nodeData->origRectW - 1);
+        oldOffset = linkPointEnd.origY - nodeData->nodeRect.corner.origY;
+        newOffset = oldOffset * nodeData->nodeRect.size.origH / oldH;
+        linkPointEnd.origY = (nodeData->nodeRect.corner.origY + newOffset);
+        linkPointEnd.origX = (nodeData->nodeRect.corner.origX + nodeData->nodeRect.size.origW - 1);
         break;
     case portSideSouth:
-        oldOffset = endPointOrig.x() - nodeData->origCornerX;
-        newOffset = oldOffset * nodeData->origRectW / oldW;
-        endPointOrig.setX(nodeData->origCornerX + newOffset);
-        endPointOrig.setY(nodeData->origCornerY + nodeData->origRectH - 1);
+        oldOffset = linkPointEnd.origX - nodeData->nodeRect.corner.origX;
+        newOffset = oldOffset * nodeData->nodeRect.size.origW / oldW;
+        linkPointEnd.origX = (nodeData->nodeRect.corner.origX + newOffset);
+        linkPointEnd.origY = (nodeData->nodeRect.corner.origY + nodeData->nodeRect.size.origH - 1);
         break;
     case portSideWest:
-        oldOffset = endPointOrig.y() - nodeData->origCornerY;
-        newOffset = oldOffset * nodeData->origRectH / oldH;
-        endPointOrig.setY(nodeData->origCornerY + newOffset);
+        oldOffset = linkPointEnd.origY - nodeData->nodeRect.corner.origY;
+        newOffset = oldOffset * nodeData->nodeRect.size.origH / oldH;
+        linkPointEnd.origY = (nodeData->nodeRect.corner.origY + newOffset);
         break;
     }
     // cout << "updLinkAftResizeStart(): " << oldW << " : " << newW << " : " << oldH << " : " << newH << endl;

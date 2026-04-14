@@ -10,8 +10,8 @@ EgGraphForm::EgGraphForm(QWidget *parent) :
 {
     ui->setupUi(this);
 
-    verticalLayout = new QVBoxLayout(ui-> centralwidget);
-    horizontalLayout = new QHBoxLayout();
+    vertLayout = new QVBoxLayout(ui-> centralwidget);
+    horzlLayout = new QHBoxLayout(); // (ui-> centralwidget);
 
     DragWidget = new TemplatesDragWidget(ui-> centralwidget);
     DragWidget-> myForm = this;
@@ -28,7 +28,7 @@ EgGraphForm::EgGraphForm(QWidget *parent) :
 
     // GraphWidget-> showCanvasRectangle =  GraphWidget->globCanvasOrig.x() < 400 || GraphWidget->globCanvasOrig.y() < 300;
 
-    scrollArea1 = new QScrollArea();
+    scrollArea1 = new QScrollArea(ui-> centralwidget);
 
     scrollArea1-> setWidget(GraphWidget);
     scrollArea1-> setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -36,26 +36,24 @@ EgGraphForm::EgGraphForm(QWidget *parent) :
 
     scrollArea1-> setMinimumSize(400, 300);
 
-    spacer1 = new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum);
-    spacer2 = new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum);
+    // spacer1 = new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum);
+    // horizontalSpacer = new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum);
 
-    verticalLayout-> addWidget(DragWidget);
-    verticalLayout-> addItem(spacer1);
-    verticalLayout-> addWidget(scrollArea1);
+    horzlLayout-> addWidget(scrollArea1);
+    horzlLayout-> addWidget(ui-> frame);
 
-    spacer3 = new QSpacerItem(0, 0, QSizePolicy::Expanding, QSizePolicy::Minimum);
+    vertLayout-> addWidget(DragWidget);
+    vertLayout-> addLayout(horzlLayout);
 
-    horizontalLayout-> addWidget(ui-> groupBox);
-    horizontalLayout-> addItem(spacer3);
-    horizontalLayout-> addWidget(ui-> groupBox_2);
-
-    verticalLayout-> addItem(spacer2);
-    verticalLayout-> addItem(horizontalLayout);
-
+    clearButtons();
     ui->moveModeButton-> setStyleSheet("background-color: lightgreen;");
-    ui->connectsModeButton-> setStyleSheet("background-color: white;");
 
     this->resize(1200, 800);
+
+    lockFileDesc = writeLockFile("egWidgetsDemoLock.lck"); // master lock
+
+    if (lockFileDesc < 0)
+        cout << "Database is locked by other app instance, exit" << endl; // exit in main.cpp
 }
 
 EgGraphForm::~EgGraphForm()
@@ -65,13 +63,28 @@ EgGraphForm::~EgGraphForm()
     delete DragWidget;
     delete scrollArea1;
 
-    delete verticalLayout;
+    delete vertLayout;
+
+    if (lockFileDesc >=0)
+        unlockFile(lockFileDesc);
 }
 
+void EgGraphForm::showEvent(QShowEvent *event)
+{
+    /* lockFileDesc = lockFile("egWidgetsDemoLock.lck");
+
+    if (lockFileDesc < 0) { //
+        cout << "Database is locked by other instance, exit" << endl;
+        qApp->quit();
+    } */
+}
+
+
+/*
 void EgGraphForm::LoadImages()
 {
 
-}
+} */
 
 inline void EgGraphForm::clearButtons()
 {
@@ -79,7 +92,7 @@ inline void EgGraphForm::clearButtons()
     ui->connectsModeButton-> setStyleSheet("background-color: white;");
     ui->linkEditModeButton-> setStyleSheet("background-color: white;");
     ui->deleteModeButton->   setStyleSheet("background-color: white;");
-    ui->detailsButton->      setStyleSheet("background-color: white;");
+    // ui->detailsButton->      setStyleSheet("background-color: white;");
 
     GraphWidget->arrowIcon-> hide();
     GraphWidget-> clearEditLink();
@@ -121,14 +134,14 @@ void EgGraphForm::on_clearButton_clicked()
 void EgGraphForm::on_moveModeButton_clicked()
 {
     clearButtons();
-    GraphWidget-> actionMode = moveMode;
+    GraphWidget-> setActionMode(moveResizeMode);
     ui->moveModeButton-> setStyleSheet("background-color: lightgreen;");
 }
 
 void EgGraphForm::on_connectsModeButton_clicked()
 {
     clearButtons();
-    GraphWidget-> actionMode = connectMode;
+    GraphWidget-> setActionMode(connectMode);
     ui->connectsModeButton-> setStyleSheet("background-color: lightgreen;");
 }
 /*
@@ -143,25 +156,25 @@ void EgGraphForm::dropEvent(QDropEvent *event)
 void EgGraphForm::on_linkEditModeButton_clicked()
 {
     clearButtons();
-    GraphWidget-> actionMode = linkEditMode;
+    GraphWidget-> setActionMode(linkEditMode);
     ui->linkEditModeButton-> setStyleSheet("background-color: lightgreen;");
 }
 
 void EgGraphForm::on_deleteModeButton_clicked()
 {
     clearButtons();
-    GraphWidget-> actionMode = nodeDeleteMode;
+    GraphWidget-> setActionMode(nodeDeleteMode);
     ui->deleteModeButton-> setStyleSheet("background-color: lightgreen;");
 }
 
-
+/*
 void EgGraphForm::on_lvlUpButton_clicked()
 {
     // clearButtons();
     GraphWidget-> LayerUp();
     // GraphWidget-> actionMode = moveMode;
     // ui->moveModeButton-> setStyleSheet("background-color: lightgreen;");
-}
+} */
 
 
 /* void EgGraphForm::on_lvlDownButton_clicked()
@@ -183,7 +196,6 @@ void EgGraphForm::closeEvent(QCloseEvent *event)
     }
 }
 
-
 void EgGraphForm::on_settingsButton_clicked()
 {
     if (! settingsForm) {
@@ -194,11 +206,17 @@ void EgGraphForm::on_settingsButton_clicked()
     settingsForm-> show();
 }
 
-
+/*
 void EgGraphForm::on_detailsButton_clicked()
 {
     clearButtons();
     GraphWidget-> actionMode = detailsLayerMode;
     ui->detailsButton-> setStyleSheet("background-color: lightgreen;");
+} */
+
+
+void EgGraphForm::on_openTableButton_clicked()
+{
+    GraphWidget-> OpenTableForm();
 }
 

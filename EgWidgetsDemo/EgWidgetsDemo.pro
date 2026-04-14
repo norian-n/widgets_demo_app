@@ -17,7 +17,9 @@ SOURCES += \
     EgLinkWidget.cpp \
     EgNodeWidget.cpp \
     EgSettingsForm.cpp \
+    EgTemplateWidget.cpp \
     NodeForm.cpp \
+    NodesTableForm.cpp \
     TemplatesDragWidget.cpp \
     main.cpp \
     EgGraphForm.cpp
@@ -29,13 +31,16 @@ HEADERS += \
     EgLinkWidget.h \
     EgNodeWidget.h \
     EgSettingsForm.h \
+    EgTemplateWidget.h \
     NodeForm.h \
+    NodesTableForm.h \
     TemplatesDragWidget.h
 
 FORMS += \
     EgGraphForm.ui \
     EgSettingsForm.ui \
-    NodeForm.ui
+    NodeForm.ui \
+    NodesTableForm.ui
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin

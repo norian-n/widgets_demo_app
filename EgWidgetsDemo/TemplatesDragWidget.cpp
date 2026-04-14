@@ -1,86 +1,106 @@
 #include "TemplatesDragWidget.h"
 #include "EgGraphForm.h"
 
+#include "EgTemplateWidget.h"
+
 #include <QtWidgets>
 #include <QSizePolicy>
+#include <QtMath>
 
-TemplatesDragWidget::TemplatesDragWidget(QWidget *parent)
-    : QFrame(parent), itemData (new QByteArray), painter (new QPainter) //, pixmapTmp (new QPixmap)
+using namespace std;
+
+TemplatesDragWidget::TemplatesDragWidget(QWidget *parent) : QFrame(parent)
+    , itemData (new QByteArray) //, painter (new QPainter) //, pixmapTmp (new QPixmap)
 {
-    setMinimumSize(100, 88);
-    resize(200, 88);
-
+    setMinimumSize(100, 68);
     setFrameStyle(QFrame::Sunken | QFrame::StyledPanel);
-    // setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);  // Fixed
-
-    // setAcceptDrops(true);
-
-    QImage image(88,68, QImage::Format_ARGB32);
-    image.fill(qRgba(0, 0, 0, 0));
-
-    QPainter painter2(&image);
-
-    painter2.setPen(QColor(0,20,172,255));
-    painter2.drawRoundedRect(0,0,84,64, 7,7);
-
-    painter2.setPen(Qt::blue);
-    painter2.setFont(QFont("Arial", 10, QFont::Bold));
-    painter2.drawText(2, 20, "New node");
-
-    painter2.end();
-
-    QLabel* imageIcon = new QLabel(this);
-    imageIcon->setPixmap(QPixmap::fromImage(image));
-    imageIcon->move(10, 10);
-    imageIcon->show();
-    imageIcon->setAttribute(Qt::WA_DeleteOnClose);
-
-    imageIcon-> setProperty("egDbID", 101);  // FIXME STUB
 }
+
+TemplatesDragWidget::~TemplatesDragWidget()
+{
+    delete itemData;
+
+    while ((dragWidget = findChild<EgTemplateWidget*>()))
+        delete dragWidget;
+}
+
+void TemplatesDragWidget::showEvent(QShowEvent *event)
+{
+    dragWidget = new EgTemplateWidget(this);
+    dragWidget-> labelText = "New node";
+    dragWidget-> fillColor = QColor(200, 200, 255, 255);
+    // dragWidget-> imagePath = "images/feather.png";
+    dragWidget-> resize(newNodeWidth, newNodeHeight);
+    dragWidget-> move(4, 4);
+    dragWidget-> show();
+
+    dragWidget = new EgTemplateWidget(this);
+    dragWidget-> labelText = "New node";
+    dragWidget-> fillColor = QColor(200, 255, 200, 255);
+    // dragWidget-> imagePath = "images/clover.png";
+    dragWidget-> resize(newNodeWidth, newNodeHeight);
+    dragWidget-> move(newNodeWidth + 8, 4);
+    dragWidget-> show();
+
+    dragWidget = new EgTemplateWidget(this);
+    dragWidget-> labelText = "New node";
+    dragWidget-> fillColor = QColor(255, 255, 200, 255);
+    // dragWidget-> imagePath = "images/book.png";
+    dragWidget-> resize(newNodeWidth, newNodeHeight);
+    dragWidget-> move(newNodeWidth * 2 + 12, 4);
+    dragWidget-> show();
+
+    QFrame::showEvent(event);
+}
+
+/*
+backpack.png
+belt.png
+bomb.png
+book.png
+bronze_coin.png
+clover.png
+feather.png
+'half timbered house AA tileset 1.bmp'
+house1.png
+house2.png
+ring.png
+tree1.png
+TSbuildings.BMP
+*/
 
 void TemplatesDragWidget::mousePressEvent(QMouseEvent *event)
 {
-    QLabel *child = static_cast<QLabel*>(childAt(event->pos()));
+    QWidget* checkWidget = childAt(event->pos());       // check if click on a widget
+    // if (checkWidget)
+    //    cout << "mousePressEvent() widget: " << checkWidget-> whatsThis().toStdString() << endl;
+    if (checkWidget) // widget is node
+    {
+        dragWidget = static_cast<EgTemplateWidget*> (checkWidget);
+        QPixmap pixmap = dragWidget-> grab(); // had to be local
 
-    if (!child)
-        return;
+        QDataStream dataStream(itemData, QIODevice::WriteOnly);
+        dataStream << pixmap << QPoint(event->pos() - dragWidget->pos()) << dragWidget-> fillColor;
 
-    QPixmap pixmap = child->pixmap();
+        QMimeData *mimeData = new QMimeData;
+        mimeData->setData("application/x-dnditemdata", *itemData);
 
-    painter-> begin(&pixmap);
-    painter-> fillRect(pixmap.rect(), QColor(63, 255, 63, 32)); //  QColor(127, 127, 127, 127));
-    painter-> end();
+        QDrag *drag = new QDrag(this);
 
-    QDataStream dataStream(itemData, QIODevice::WriteOnly);
-    dataStream << pixmap << QPoint(event->pos() - child->pos());
+        drag->setMimeData(mimeData);
+        drag->setPixmap(pixmap);
+        drag->setHotSpot(event->pos() - dragWidget->pos());
 
-    QMimeData *mimeData = new QMimeData;
-    mimeData->setData("application/x-dnditemdata", *itemData);
+        dragWidget-> hide();
 
-    QDrag *drag = new QDrag(this);
+        myForm-> dragDropAction = true;
+        drag-> exec(Qt::CopyAction);
+        myForm-> dragDropAction = false;
 
-    drag->setMimeData(mimeData);
-    drag->setPixmap(pixmap);
-    drag->setHotSpot(event->pos() - child->pos());
-/*
-    QPixmap* tempPixmap = new QPixmap(pixmap);
+        itemData->clear();
+        delete drag;
 
-    painter-> begin(tempPixmap);
-    painter-> fillRect(pixmap.rect(), QColor(63, 255, 63, 32)); //  QColor(127, 127, 127, 127));
-    painter-> end();
+        dragWidget-> show();
+    }
 
-    child->setPixmap(*tempPixmap);
-*/
-    // qDebug() << "ID: " << child-> property("egDbID").toInt();
-
-    myForm-> dragDropAction = true;
-    drag-> exec(Qt::CopyAction);
-    myForm-> dragDropAction = false;
-
-        // restore and cleanup
-
-    // child->setPixmap(pixmap);
-    itemData->clear();
-    if (drag) delete drag;
-    // if (tempPixmap) delete tempPixmap;
 }

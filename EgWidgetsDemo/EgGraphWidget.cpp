@@ -3,7 +3,9 @@
 #include "EgLinkWidget.h"
 #include "EgGraphForm.h"
 #include "NodeForm.h"
-#include "ui_EgGraphForm.h"
+#include "NodesTableForm.h"
+#include "EgSettingsForm.h"
+// #include "ui_EgGraphForm.h"
 
 #include <QtWidgets>
 #include <QSizePolicy>
@@ -15,90 +17,27 @@ using namespace std;
 EgGraphWidget::EgGraphWidget(QWidget *parent)
     : QFrame(parent), itemData (new QByteArray), globPainter (new QPainter), pixmapTmp (new QPixmap)
 {
-    // myForm = (EgGraphForm*) parent;
-    setFocusPolicy(Qt::WheelFocus); // setFocus()
+    setFocusPolicy(Qt::WheelFocus);
 
-    arrowIcon = new EgLinkWidget(this);  // dynamic connect link arrow
+    arrowIcon = new EgLinkWidget(this);  // dynamic connect link arrow, delete in destructor
     arrowIcon-> setWhatsThis(QString("arrow"));
+    arrowIcon-> setMouseTracking(false);
+    arrowIcon-> lineType = directConnect;
     arrowIcon-> hide();
-    arrowIcon-> setAttribute(Qt::WA_DeleteOnClose);
-
     // cout << "EgGraphWidget() called" << endl;
 }
 
 EgGraphWidget::~EgGraphWidget()
 {
-    while ( QWidget* w = findChild<QWidget*>() )
-        delete w;
+    clearLayer();
+    for (auto iter: deleteWidgets) // node widgets delayed cleanup
+        delete iter;
 
-    if (graphNodes && graphNodes-> isConnected)
-        graphNodes-> clear();
-
-    if (graphLinks && graphLinks-> linksDataStorage.isConnected)
-        graphLinks-> linksDataStorage.clear();
-
-    delete graphNodes;
-    delete graphLinks;
-    delete itemData;
+    delete itemData; // itemData (new QByteArray), globPainter (new QPainter), pixmapTmp (new QPixmap)
     delete globPainter;
     delete pixmapTmp;
-}
 
-
-void EgGraphWidget::clear()
-{
-    clearEditLink();
-
-    if (actionMode == connectMode)
-        arrowIcon-> hide();
-
-    /*for (auto nodesIter : dataNodesMap) { // clear all nodes types of layert
-        graphNodes = nodesIter.second; */
-    if (! graphNodes) {
-        cout << "clear(): null nodes ptr" << endl;
-    } else if (graphNodes-> isConnected)
-    {
-        for (auto nodesIter : graphNodes-> dataMap)
-        {
-            EgNodeWidget* nodeWidget = static_cast<EgNodeWidget*> (nodesIter.second-> serialDataPtr);
-            delete nodeWidget;
-        }
-        graphNodes-> clear();
-    }
-    // }
-
-    /* for (auto linksIter : dataLinksMap) { // clear all link types of layert
-        graphLinks = linksIter.second; */
-    if (! graphLinks) {
-        cout << "ERROR clear(): null links ptr" << endl;
-    } else if (graphLinks-> linksDataStorage.isConnected)
-    {
-        for (auto linksIter : graphLinks-> dataMap)
-        {
-            EgLinkWidget* linkWidget = static_cast<EgLinkWidget*> (linksIter.second-> serialDataPtr);
-            delete linkWidget;
-        }
-        graphLinks-> linksDataStorage.clear();
-    }
-    // }
-
-    zoomFactor = 0;
-
-    /*globCanvasScaledCorner.setX(0);
-    globCanvasScaledCorner.setY(0);
-    globCanvasScaledWidth  = globCanvasOrig.x(); // FIXME set to window size
-    globCanvasScaledHeight = globCanvasOrig.y(); */
-
-    layerCanvas.corner.origX = 0;
-    layerCanvas.corner.origY = 0;
-    layerCanvas.corner.scaledX = 0;
-    layerCanvas.corner.scaledY = 0;
-    layerCanvas.size.scaledW = layerCanvas.size.origW;
-    layerCanvas.size.scaledH = layerCanvas.size.origH;
-
-    scaledArrowLength = arrowLengthOrig;
-
-    this-> repaint();
+    delete arrowIcon; // arrowIcon = new EgLinkWidget(this);
 }
 
 void EgGraphWidget::clearLayer()
@@ -107,53 +46,34 @@ void EgGraphWidget::clearLayer()
 
     if (actionMode == connectMode)
         arrowIcon-> hide();
-    // graphNodes = currentLayer -> getNextNodesType(); while (graphNodes) { ... graphNodes = currentLayer -> getNextNodesType(); }
-    /* for (auto nodesIter : dataNodesNames) {
-        auto findIter = dataNodesMap.find(nodesIter); // // try to find loaded nodes type
-        if (findIter != dataNodesMap.end()) {
-            graphNodes = findIter-> second; */
-    if (! graphNodes) {
-        cout << "clearLayer(): null nodes ptr" << endl;
-    } else if (graphNodes-> isConnected) {
+
+    if (graphNodes && graphNodes-> isConnected) {
         graphNodes-> Store();
         for (auto nodesIter : graphNodes-> dataMap)
         {
             EgNodeWidget* nodeWidget = static_cast<EgNodeWidget*> (nodesIter.second-> serialDataPtr);
-            cout << "clearLayer(): clear widget " << nodeWidget-> dataNodeID << endl;
-            delete nodeWidget;
-            nodesIter.second-> serialDataPtr = nullptr;
+            // cout << "clearLayer(): clear widget " << nodeWidget-> dataNodeID << endl;
+            nodeWidget-> hide();
+            deleteWidgets.append(nodeWidget); // late widgets clearup, seems events queue issue causes crash
+            // nodesIter.second-> serialDataPtr = nullptr;
         }
         graphNodes-> clear();
         graphNodes-> isConnected = false;
     }
-    // }
-    // }
-    /*for (auto linksIter : dataLinksNames) {
-        auto findIterLinks = dataLinksMap.find(linksIter); // // try to find loaded nodes type
-        if (findIterLinks != dataLinksMap.end()) {
-            graphLinks = findIterLinks-> second; */
-    if (! graphLinks) {
-        cout << "clearLayer(): null links ptr" << endl;
-    } else if (graphLinks-> linksDataStorage.isConnected) {
+
+    if (graphLinks && graphLinks-> linksDataStorage.isConnected) {
         graphLinks->StoreLinks();
         for (auto linksIter : graphLinks-> dataMap)
         {
             EgLinkWidget* linkWidget = static_cast<EgLinkWidget*> (linksIter.second-> serialDataPtr);
             delete linkWidget;
-            linksIter.second-> serialDataPtr = nullptr;
+            // linksIter.second-> serialDataPtr = nullptr;
         }
         graphLinks-> linksDataStorage.clear();
         graphLinks-> linksDataStorage.isConnected = false;
     }
-    // }
-    // }
 
     zoomFactor = 0;
-
-    /*globCanvasScaledCorner.setX(0);
-    globCanvasScaledCorner.setY(0);
-    globCanvasScaledWidth  = globCanvasOrig.x(); // FIXME set to window size
-    globCanvasScaledHeight = globCanvasOrig.y(); */
 
     layerCanvas.corner.origX = 0;
     layerCanvas.corner.origY = 0;
@@ -163,36 +83,57 @@ void EgGraphWidget::clearLayer()
     layerCanvas.size.scaledH = layerCanvas.size.origH;
 
     scaledArrowLength = arrowLengthOrig;
+    scaledGlobalIndent = globalIndentOrig;
 
-    this-> repaint();
+    dataNodeWidget    = nullptr;
+    targetNodeWidget  = nullptr;
+    tmpNodeWidget     = nullptr;
+
+    // repaint();
+}
+
+void EgGraphWidget::setActionMode(int actMode) {
+    actionMode = actMode;
+    for (auto nodesIter : graphNodes-> dataMap)
+    {
+        EgNodeWidget* nodeWidget = static_cast<EgNodeWidget*> (nodesIter.second-> serialDataPtr);
+        nodeWidget-> actionMode = actMode;
+    }
 }
 
 inline void EgGraphWidget::moveResizeNodeWidget(EgNodeWidget* theWidget)
 {
-    theWidget-> resize(theWidget->scaledRectW, theWidget->scaledRectH);
-    theWidget-> move(theWidget->scaledCornerX, theWidget->scaledCornerY);
+    theWidget-> resize(theWidget-> nodeRect.size.scaledW, theWidget-> nodeRect.size.scaledH);
+    theWidget-> move  (theWidget-> nodeRect.corner.scaledX, theWidget-> nodeRect.corner.scaledY);
 }
 
 void EgGraphWidget::moveResizeLinkWidget(EgLinkWidget* theWidget)
 {
-    theWidget-> resize(theWidget->scaledRectW, theWidget->scaledRectH);
-    theWidget-> move(theWidget->scaledCornerX,  theWidget->scaledCornerY);
+    theWidget-> resize(theWidget-> linkRect.size.scaledW, theWidget-> linkRect.size.scaledH);
+    theWidget-> move  (theWidget-> linkRect.corner.scaledX,  theWidget-> linkRect.corner.scaledY);
 }
 
-inline void EgGraphWidget::updateGlobCanvas(EgNodeWidget* nodeWidget)
+
+inline void EgGraphWidget::updateLayerCanvas()
 {
-    layerCanvas.size.origW = std::max(layerCanvas.size.origW, nodeWidget->origCornerX + nodeWidget->origRectW + globalIndentOrig); // FIXME top left corner check
-    layerCanvas.size.origH = std::max(layerCanvas.size.origH, nodeWidget->origCornerY + nodeWidget->origRectH + globalIndentOrig);
+    int newW = std::max (layerCanvas.size.origW, dataNodeWidget->nodeRect.corner.origX + dataNodeWidget->nodeRect.size.origW + globalIndentOrig);
+    int newH = std::max (layerCanvas.size.origH, dataNodeWidget->nodeRect.corner.origY + dataNodeWidget->nodeRect.size.origH + globalIndentOrig);
 
-    origToScaledRect(layerCanvas, zoomFactor);
-
-    setMinimumSize(layerCanvas.size.origW, layerCanvas.size.origH);
-    // myForm-> scrollArea1->setMinimumSize(layerCanvas.size.origW, layerCanvas.size.origH);
+    if (newW > layerCanvas.size.origW || newH > layerCanvas.size.origH) {
+        layerCanvas.size.origW = newW;
+        layerCanvas.size.origH = newH;
+        origToScaledLayer(layerCanvas, zoomFactor);
+        graphLayers[layerID]->layerWidth = layerCanvas.size.origW;
+        graphLayers[layerID]->layerHeight = layerCanvas.size.origH;
+        graphLayers.updateWH(layerID, layerCanvas.size.origW, layerCanvas.size.origH);
+        setMinimumSize(layerCanvas.size.origW, layerCanvas.size.origH);
+        repaint();
+    }
 }
 
 inline void EgGraphWidget::rescaleZoom()
 {
-    cout << "rescaleZoom() zoomFactor: " << zoomFactor << endl;
+    // cout << "rescaleZoom() zoomFactor: " << zoomFactor << endl;
     if (actionMode == connectMode)
         arrowIcon-> hide();
 
@@ -201,16 +142,18 @@ inline void EgGraphWidget::rescaleZoom()
 
     origToScaledLayer(layerCanvas, zoomFactor);
 
-    cout << "rescaleZoom() scaledW: " << layerCanvas.size.scaledW << " scaledH:" << layerCanvas.size.scaledH << endl;
-    cout << "rescaleZoom() scaledX: " << layerCanvas.corner.scaledX << " scaledY:" << layerCanvas.corner.scaledY << endl;
+    // cout << "rescaleZoom() scaledW: " << layerCanvas.size.scaledW << " scaledH:" << layerCanvas.size.scaledH << endl;
+    // cout << "rescaleZoom() scaledX: " << layerCanvas.corner.scaledX << " scaledY:" << layerCanvas.corner.scaledY << endl;
 
     if (graphNodes-> isConnected)
     {
         for (auto nodesIter : graphNodes-> dataMap)
         {
             EgNodeWidget* nodeWidget = static_cast<EgNodeWidget*> (nodesIter.second-> serialDataPtr);
-            QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
-            nodeWidget-> calcOrigToScaled(zoomFactor, tmpPoint);
+            // QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
+            // nodeWidget-> calcOrigToScaled(zoomFactor, tmpPoint);
+            // nodeWidget-> zoomFactor = zoomFactor;
+            origToScaledRectCanvas   (nodeWidget->nodeRect, zoomFactor, layerCanvas.corner);
             moveResizeNodeWidget(nodeWidget);
             // cout << "rescaleZoom() nodeID: " << nodeWidget-> dataNodeID << endl;
         }
@@ -221,165 +164,138 @@ inline void EgGraphWidget::rescaleZoom()
         for (auto linksIter : graphLinks->dataMap)
         {
             EgLinkWidget* linkWidget = static_cast<EgLinkWidget*> (linksIter.second-> serialDataPtr);
-            QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
-            linkWidget-> calcOrigToScaled(zoomFactor, tmpPoint);
-            linkWidget-> calcLinkWidgetRect(zoomFactor);
+            // QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
+            origToScaledPointCanvas  (linkWidget-> linkPointStart, zoomFactor, layerCanvas.corner);
+            origToScaledPointCanvas  (linkWidget-> linkPointEnd, zoomFactor, layerCanvas.corner);
+            // linkWidget-> calcOrigToScaled(zoomFactor, layerCanvas);
+            if (linkWidget != linkEditSelected)
+                linkWidget-> calcLinkWidgetRect(zoomFactor, scaledGlobalIndent);
+            else
+                origToScaledRectCanvas   (linkWidget->linkRect, zoomFactor, layerCanvas.corner);
             moveResizeLinkWidget(linkWidget);
             linkWidget-> lower();
             // cout << "rescaleZoom() linkID: " << linkWidget->dataLinkID << endl;
         }
     }
-    this-> repaint();
+    repaint();
 }
 
-
-/*
-inline void EgGraphWidget::calcOuterCorner()
-{
-    int maxOrigCanvX {0};
-    int maxOrigCanvY {0};
-
-    if (graphNodes-> isConnected)
-    {
-        for (auto nodesIter : graphNodes-> dataMap)
-        {
-            EgNodeWidget* nodeWidget = static_cast<EgNodeWidget*> (nodesIter.second-> serialDataPtr);
-            maxOrigCanvX = std::max (maxOrigCanvX, nodeWidget-> origCornerX + nodeWidget->origRectW);
-            maxOrigCanvY = std::max (maxOrigCanvY, nodeWidget-> origCornerY + nodeWidget->origRectH);
-        }
-    }
-    cout << "calcOuterCorner(): " << dec << maxOrigCanvX << " : " << maxOrigCanvY << endl;
-    cout << "globCanvasMinArea : " << globCanvasMinArea.x() << " : " <<  globCanvasMinArea.y() << endl;
-
-    globCanvasMinArea.setX(maxOrigCanvX);
-    globCanvasMinArea.setY(maxOrigCanvY);
-
-    globCanvasOrig.setX(maxOrigCanvX);
-    globCanvasOrig.setY(maxOrigCanvY);
-} */
-
-inline void EgGraphWidget::adjustToGridX(int& coordX)
-{
-    if (coordX > layerCanvas.size.origW)
-        coordX = layerCanvas.size.origW - globalIndentOrig;
-    if (coordX < globalIndentOrig)
-        coordX = globalIndentOrig;
-    int modulo = coordX % gridSizeOrig;
-    if (! modulo)
-        return;
-    if (modulo < gridSizeOrig/2)
-        coordX -= modulo;
-    else
-        coordX += gridSizeOrig-modulo;
-    cout << "adjustToGridX() modulo: " << dec << modulo << " coordX: " << coordX << endl;
-}
-
-inline void EgGraphWidget::adjustToGridY(int& coordY)
-{
-    if (coordY > layerCanvas.size.origH)
-        coordY = layerCanvas.size.origH - globalIndentOrig;
-    if (coordY < globalIndentOrig)
-        coordY = globalIndentOrig;
-    int modulo = coordY % gridSizeOrig;
-    if (! modulo)
-        return;
-    if (modulo < gridSizeOrig/2)
-        coordY -= modulo;
-    else
-        coordY += gridSizeOrig-modulo;
-    cout << "adjustToGridX() modulo: " << dec << modulo << " coordY: " << coordY << endl;
-}
-
-inline void EgGraphWidget::adjustPointToGrid(QPoint& thePoint)
-{
-    int coordX {thePoint.x()};
-    int coordY {thePoint.y()};
-    adjustToGridX(coordX);
-    adjustToGridY(coordY);
-    thePoint.setX(coordX);
-    thePoint.setY(coordY);
+inline EgNodeWidget* EgGraphWidget::getNodeWidget(EgDataNodeIDType nodeID) {
+    return static_cast <EgNodeWidget*> (graphNodes->nodesContainer-> GetNodePtrByID(nodeID)-> serialDataPtr);
 }
 
 void loadNodeObjectFromDb (EgDataNode& dataNode) //  pumped to dataNode.serialDataPtr
 {
-    EgNodeWidget* nodeWidgetPtr = new EgNodeWidget();
-    dataNode.serialDataPtr = (void*) nodeWidgetPtr;
+    EgNodeWidget* nodeWidget = new EgNodeWidget(); // delete on layer cleanup clearLayer()
+    dataNode.serialDataPtr = (void*) nodeWidget;
 
-    nodeWidgetPtr-> dataNodeID = dataNode.dataNodeID;
+    nodeWidget-> dataNodeID = dataNode.dataNodeID;
+    dataNode["detailsLayerID"] >> nodeWidget-> detailsLayerID;
+    // cout << "loadNodeObjectFromDb() detailsLayerID: " << nodeWidget-> detailsLayerID << endl;
 
-    dataNode["detailsLayerID"] >> nodeWidgetPtr-> detailsLayerID;
-    cout << "loadNodeObjectFromDb() detailsLayerID: " << nodeWidgetPtr-> detailsLayerID << endl;
+    dataNode["name"]        >> nodeWidget-> labelText;
+    dataNode["description"] >> nodeWidget-> descText;
 
-    dataNode["name"]    >> nodeWidgetPtr-> labelText;
-    dataNode["cornerX"] >> nodeWidgetPtr-> scaledCornerX;
-    dataNode["cornerY"] >> nodeWidgetPtr-> scaledCornerY;
-    dataNode["rectH"]   >> nodeWidgetPtr-> scaledRectH;
-    dataNode["rectW"]   >> nodeWidgetPtr-> scaledRectW;
+    dataNode["cornerX"] >> nodeWidget-> nodeRect.corner.origX; // scaledCornerX;
+    dataNode["cornerY"] >> nodeWidget-> nodeRect.corner.origY; // scaledCornerY;
+    dataNode["rectH"]   >> nodeWidget-> nodeRect.size.origH; // scaledRectH;
+    dataNode["rectW"]   >> nodeWidget-> nodeRect.size.origW; // scaledRectW;
 
-    nodeWidgetPtr-> origCornerX = nodeWidgetPtr-> scaledCornerX;
-    nodeWidgetPtr-> origCornerY = nodeWidgetPtr-> scaledCornerY;
-    nodeWidgetPtr-> origRectW   = nodeWidgetPtr-> scaledRectW;
-    nodeWidgetPtr-> origRectH   = nodeWidgetPtr-> scaledRectH;
+    int tmpColor;
+    dataNode["fillColor"]   >> tmpColor;
+    nodeWidget-> fillColor = QColor(tmpColor);
+
+    if (dataNode["image"].dataSize) // && nodeWidget->pixmap
+    {
+        QByteArray itemData;
+        QDataStream dataStream(&itemData, QIODevice::ReadOnly);
+        dataNode["image"] >> itemData;
+        dataStream >> *(nodeWidget->pixmap);
+    }
+
+    resetToOrigRect(nodeWidget-> nodeRect);
     // cout << "loadNodeObjectFromDb() nodeName: " << newNodePtr-> labelText.toStdString() << endl;
 }
 
 void storeNodeObjectToDb  (EgDataNode& dataNode)
 {
-    EgNodeWidget* nodeWidgetPtr = static_cast<EgNodeWidget*> (dataNode.serialDataPtr);
+    EgNodeWidget* nodeWidget = static_cast<EgNodeWidget*> (dataNode.serialDataPtr);
 
-    dataNode["detailsLayerID"] << nodeWidgetPtr-> detailsLayerID;
-    cout << "storeNodeObjectToDb() detailsLayerID: " << nodeWidgetPtr-> detailsLayerID << endl;
+    dataNode["detailsLayerID"] << nodeWidget-> detailsLayerID;
+    // cout << "storeNodeObjectToDb() detailsLayerID: " << nodeWidgetPtr-> detailsLayerID << endl;
 
-    dataNode["name"]    << nodeWidgetPtr-> labelText;     // PrintByteArray(dataNode["name"]);
-    dataNode["cornerX"] << nodeWidgetPtr-> origCornerX;
-    dataNode["cornerY"] << nodeWidgetPtr-> origCornerY;
-    dataNode["rectH"]   << nodeWidgetPtr-> origRectH;
-    dataNode["rectW"]   << nodeWidgetPtr-> origRectW;
+    dataNode["name"]        << nodeWidget-> labelText;     // PrintByteArray(dataNode["name"]);
+    dataNode["description"] << nodeWidget-> descText;
+    dataNode["cornerX"]     << nodeWidget-> nodeRect.corner.origX; // origCornerX;
+    dataNode["cornerY"]     << nodeWidget-> nodeRect.corner.origY; //origCornerY;
+    dataNode["rectH"]       << nodeWidget-> nodeRect.size.origH;
+    dataNode["rectW"]       << nodeWidget-> nodeRect.size.origW; // origRectW;
 
-    nodeWidgetPtr-> scaledCornerX = nodeWidgetPtr-> origCornerX; // FIXME STUB
-    nodeWidgetPtr-> scaledCornerY = nodeWidgetPtr-> origCornerY;
-    nodeWidgetPtr-> scaledRectW = nodeWidgetPtr-> origRectW;
-    nodeWidgetPtr-> scaledRectH = nodeWidgetPtr-> origRectH;
+    int tmpColor = nodeWidget-> fillColor.rgba();
+    dataNode["fillColor"] << tmpColor;
+
+    if (nodeWidget->pixmap && nodeWidget->pixmap-> width()) {
+        QByteArray itemData;
+        QDataStream dataStream(&itemData, QIODevice::WriteOnly);
+        dataStream << nodeWidget->pixmap-> scaled(40,40);  // FIXME literal
+        itemData >> dataNode["image"];
+    } else {
+        dataNode["image"].dataSize = 0;
+    }
+
+    resetToOrigRect(nodeWidget-> nodeRect);
 }
 
 void loadLinkObjectFromDb (EgDataNode& dataNode) //  pumped to dataNode.serialDataPtr
 {
-    EgLinkWidget* newLinkPtr = new EgLinkWidget();
-    dataNode.serialDataPtr = (void*) newLinkPtr;
-    newLinkPtr-> dataLinkID = dataNode.dataNodeID;
+    EgLinkWidget* linkWidget = new EgLinkWidget(); // delete on layer cleanup clearLayer()
+    dataNode.serialDataPtr = (void*) linkWidget;
+    linkWidget-> dataLinkID = dataNode.dataNodeID;
 
-    dataNode["toID"]        >> newLinkPtr-> nodeIDTo;
-    dataNode["fromID"]      >> newLinkPtr-> nodeIDFrom;
-    dataNode["portFrom"]    >> newLinkPtr-> portSideFrom;
-    dataNode["portTo"]      >> newLinkPtr-> portSideTo;
-    dataNode["lineType"]    >> newLinkPtr-> lineType;
+    dataNode["fromID"]        >> linkWidget-> nodeIDFrom;
+    dataNode["toID"]          >> linkWidget-> nodeIDTo;
+    dataNode["portFrom"]      >> linkWidget-> portSideFrom;
+    dataNode["portTo"]        >> linkWidget-> portSideTo;
+    dataNode["sideCoordFrom"] >> linkWidget-> sideCoordFromOrig;
+    dataNode["sideCoordTo"]   >> linkWidget-> sideCoordToOrig;
+    dataNode["lineType"]      >> linkWidget-> lineType;
 
-    int tmpInt;
-    dataNode["startPointX"] >> tmpInt;
-    newLinkPtr-> startPointOrig.setX(tmpInt);
-    dataNode["startPointY"] >> tmpInt;
-    newLinkPtr-> startPointOrig.setY(tmpInt);
+    linkWidget-> sideCoordFromScaled = linkWidget-> sideCoordFromOrig;
+    linkWidget-> sideCoordToScaled   = linkWidget-> sideCoordToOrig;
 
-    dataNode["endPointX"]   >> tmpInt;
-    newLinkPtr-> endPointOrig.setX(tmpInt);
-    dataNode["endPointY"]   >> tmpInt;
-    newLinkPtr-> endPointOrig.setY(tmpInt);
-    // cout << "loadLinkObjectFromDb() dataLinkID: " << std::dec << newLinkPtr-> dataLinkID << endl;
+    // cout << "loadLinkObjectFromDb() : " << std::dec << linkWidget-> dataLinkID << " sideCoordFromOrig: " << linkWidget-> sideCoordFromOrig
+    //      << " sideCoordToOrig: " << linkWidget-> sideCoordToOrig << endl;
+
+    // dataNode["startPointX"]   >> linkWidget-> linkPointStart.origX; // tmpInt;
+    // dataNode["startPointY"]   >> linkWidget-> linkPointStart.origY; // tmpInt;
+    resetToOrigPoint(linkWidget-> linkPointStart);
+
+    // cout << "loadLinkObjectFromDb() linkPointStart: " << std::dec << newLinkPtr-> linkPointStart.scaledX << " : " << newLinkPtr-> linkPointStart.scaledY << endl;
+    // dataNode["endPointX"] >> linkWidget-> linkPointEnd.origX; // tmpInt;
+    // dataNode["endPointY"] >> linkWidget-> linkPointEnd.origY; // tmpInt;
+    resetToOrigPoint(linkWidget-> linkPointEnd);
 }
 
 void storeLinkObjectToDb  (EgDataNode& dataNode)
 {
-    EgLinkWidget* EgLinkWidgetPtr = static_cast<EgLinkWidget*> (dataNode.serialDataPtr);
+    EgLinkWidget* linkWidget = static_cast<EgLinkWidget*> (dataNode.serialDataPtr);
 
-    dataNode["toID"]        << EgLinkWidgetPtr-> nodeIDTo;
-    dataNode["fromID"]      << EgLinkWidgetPtr-> nodeIDFrom;
-    dataNode["startPointX"] << EgLinkWidgetPtr-> startPointOrig.x();
-    dataNode["startPointY"] << EgLinkWidgetPtr-> startPointOrig.y();
-    dataNode["endPointX"]   << EgLinkWidgetPtr-> endPointOrig.x();
-    dataNode["endPointY"]   << EgLinkWidgetPtr-> endPointOrig.y();
-    dataNode["portFrom"]    << EgLinkWidgetPtr-> portSideFrom;
-    dataNode["portTo"]      << EgLinkWidgetPtr-> portSideTo;
-    dataNode["lineType"]    << EgLinkWidgetPtr-> lineType;
+    dataNode["fromID"]        << linkWidget-> nodeIDFrom;
+    dataNode["toID"]          << linkWidget-> nodeIDTo;
+    dataNode["portFrom"]      << linkWidget-> portSideFrom;
+    dataNode["portTo"]        << linkWidget-> portSideTo;
+    dataNode["sideCoordFrom"] << linkWidget-> sideCoordFromOrig;
+    dataNode["sideCoordTo"]   << linkWidget-> sideCoordToOrig;
+
+    // cout << "storeLinkObjectToDb() : " << std::dec << linkWidget-> dataLinkID << " sideCoordFromOrig: " << linkWidget-> sideCoordFromOrig
+    //      << " sideCoordToOrig: " << linkWidget-> sideCoordToOrig << endl;
+
+    // cout << "storeLinkObjectToDb() linkPointStart: " << std::dec << EgLinkWidgetPtr-> linkPointStart.scaledX << " : " << EgLinkWidgetPtr-> linkPointStart.scaledY << endl;
+    // dataNode["startPointX"]   << linkWidget-> linkPointStart.origX;
+    // dataNode["startPointY"]   << linkWidget-> linkPointStart.origY;
+    // dataNode["endPointX"]     << linkWidget-> linkPointEnd.origX;
+    // dataNode["endPointY"]     << linkWidget-> linkPointEnd.origY;
+    dataNode["lineType"]      << linkWidget-> lineType;
     // PrintEgDataNodeFields(dataNode);
 }
 /*
@@ -408,50 +324,19 @@ void EgGraphWidget::PrintNodeLinks(EgDataNode& dataNode)
 
 void EgGraphWidget::UpdateLinksAftMove(EgDataNode& dataNode, QPoint& deltaPoint)
 {
+    EgNodeWidget* nodeWidgetTmp     {nullptr};
     EgDataNode* prevLinkDataNodePtr {nullptr};
-    EgDataNode& selectedDataNode    {(*graphNodes)[dataNodeWidget->dataNodeID]}; // shortcut ref
+    // EgDataNode& selectedDataNode    {(*graphNodes)[dataNodeWidget->dataNodeID]}; // shortcut ref
         // out links
-    EgLinkWidget* nextLinkDataPtr = static_cast<EgLinkWidget*> (selectedDataNode.getNextOutLinkSerialPtr(graphLinks-> linkBlueprintID, prevLinkDataNodePtr));
+    EgLinkWidget* nextLinkDataPtr = static_cast<EgLinkWidget*> (dataNode.getNextOutLinkSerialPtr(graphLinks-> linkBlueprintID, prevLinkDataNodePtr));
     while (nextLinkDataPtr) // out links loop
     {
-        nextLinkDataPtr-> startPointScaled += deltaPoint;
-        QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
-        nextLinkDataPtr-> calcScaledToOrigStart(zoomFactor, tmpPoint);
-        UpdateOneDataLink(nextLinkDataPtr);
+        nodeWidgetTmp = getNodeWidget(nextLinkDataPtr-> nodeIDFrom);
+        nodeWidgetTmp-> getLinkPointOrig(nextLinkDataPtr-> portSideFrom, nextLinkDataPtr-> sideCoordFromOrig, nextLinkDataPtr-> linkPointStart.origX, nextLinkDataPtr-> linkPointStart.origY);
+        origToScaledPointCanvas  (nextLinkDataPtr-> linkPointStart, zoomFactor, layerCanvas.corner);
 
+        UpdateOneDataLink(nextLinkDataPtr);
         prevLinkDataNodePtr = &(graphLinks-> linksDataStorage[nextLinkDataPtr-> dataLinkID]);
-        EgDataNode* linkedNode = selectedDataNode.getOutLinkedNode(graphLinks-> linkBlueprintID, prevLinkDataNodePtr);
-        if (linkedNode)
-            cout << "UpdateLinksAftMove() OUT linked node ID: " << std::dec << linkedNode-> dataNodeID << endl;
-
-        nextLinkDataPtr = static_cast<EgLinkWidget*> (selectedDataNode.getNextOutLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
-    }
-        // in links
-    prevLinkDataNodePtr = nullptr;
-    nextLinkDataPtr = static_cast<EgLinkWidget*> (selectedDataNode.getNextInLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
-    while (nextLinkDataPtr) // in links loop
-    {
-        nextLinkDataPtr-> endPointScaled += deltaPoint;
-        QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
-        nextLinkDataPtr-> calcScaledToOrigEnd(zoomFactor, tmpPoint);
-        UpdateOneDataLink(nextLinkDataPtr);
-        prevLinkDataNodePtr = &(graphLinks->linksDataStorage[nextLinkDataPtr-> dataLinkID]); // ++
-        nextLinkDataPtr = static_cast<EgLinkWidget*> (selectedDataNode.getNextInLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
-    }
-}
-
-void EgGraphWidget::UpdateLinksAftResize(EgDataNode& dataNode, int oldW, int oldH)
-{
-    EgDataNode* prevLinkDataNodePtr {nullptr};
-    EgLinkWidget* nextLinkDataPtr = static_cast<EgLinkWidget*> (dataNode.getNextOutLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
-    while (nextLinkDataPtr) // out links loop
-    {
-        nextLinkDataPtr-> updLinkAftResizeStart(static_cast<EgNodeWidget*>(dataNode.serialDataPtr), oldW, oldH);
-        QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
-        nextLinkDataPtr-> calcOrigToScaled(zoomFactor, tmpPoint);
-        UpdateOneDataLink(nextLinkDataPtr);
-
-        prevLinkDataNodePtr = &(graphLinks->linksDataStorage[nextLinkDataPtr-> dataLinkID]);
         nextLinkDataPtr = static_cast<EgLinkWidget*> (dataNode.getNextOutLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
     }
         // in links
@@ -459,11 +344,56 @@ void EgGraphWidget::UpdateLinksAftResize(EgDataNode& dataNode, int oldW, int old
     nextLinkDataPtr = static_cast<EgLinkWidget*> (dataNode.getNextInLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
     while (nextLinkDataPtr) // in links loop
     {
-        nextLinkDataPtr-> updLinkAftResizeEnd(static_cast<EgNodeWidget*>(dataNode.serialDataPtr), oldW, oldH);
-        QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
-        nextLinkDataPtr-> calcOrigToScaled(zoomFactor, tmpPoint);
-        UpdateOneDataLink(nextLinkDataPtr);
+        nodeWidgetTmp = getNodeWidget(nextLinkDataPtr-> nodeIDTo);
+        nodeWidgetTmp-> getLinkPointOrig(nextLinkDataPtr-> portSideTo, nextLinkDataPtr-> sideCoordToOrig, nextLinkDataPtr-> linkPointEnd.origX, nextLinkDataPtr-> linkPointEnd.origY);
+        origToScaledPointCanvas  (nextLinkDataPtr-> linkPointEnd, zoomFactor, layerCanvas.corner);
 
+        UpdateOneDataLink(nextLinkDataPtr);
+        prevLinkDataNodePtr = &(graphLinks->linksDataStorage[nextLinkDataPtr-> dataLinkID]); // ++
+        nextLinkDataPtr = static_cast<EgLinkWidget*> (dataNode.getNextInLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
+    }
+}
+
+void EgGraphWidget::UpdateLinksAftResize(EgDataNode& dataNode, int oldW, int oldH)
+{
+    EgNodeWidget* nodeWidgetTmp     {nullptr};
+    EgDataNode* prevLinkDataNodePtr {nullptr};
+        // out/from links update
+    EgLinkWidget* nextLinkDataPtr = static_cast<EgLinkWidget*> (dataNode.getNextOutLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
+    while (nextLinkDataPtr)
+    {
+        nodeWidgetTmp = getNodeWidget(nextLinkDataPtr-> nodeIDFrom);
+        if (nextLinkDataPtr-> portSideFrom == portSideNorth || nextLinkDataPtr-> portSideFrom == portSideSouth)
+            nextLinkDataPtr-> sideCoordFromOrig = nextLinkDataPtr-> sideCoordFromOrig * nodeWidgetTmp->nodeRect.size.origW / oldW;
+        else
+            nextLinkDataPtr-> sideCoordFromOrig = nextLinkDataPtr-> sideCoordFromOrig * nodeWidgetTmp->nodeRect.size.origH / oldH;
+        // nextLinkDataPtr-> alignToGrid(nextLinkDataPtr-> sideCoordFromOrig); // FIXME check
+        alignToGrid(nextLinkDataPtr-> sideCoordFromOrig, gridSizeOrig, globalIndentOrig);
+
+        nodeWidgetTmp-> getLinkPointOrig(nextLinkDataPtr-> portSideFrom, nextLinkDataPtr-> sideCoordFromOrig, nextLinkDataPtr-> linkPointStart.origX, nextLinkDataPtr-> linkPointStart.origY);
+        origToScaledPointCanvas  (nextLinkDataPtr-> linkPointStart, zoomFactor, layerCanvas.corner);
+
+        UpdateOneDataLink(nextLinkDataPtr);
+        prevLinkDataNodePtr = &(graphLinks->linksDataStorage[nextLinkDataPtr-> dataLinkID]);
+        nextLinkDataPtr = static_cast<EgLinkWidget*> (dataNode.getNextOutLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
+    }
+        // in/to links update
+    prevLinkDataNodePtr = nullptr;
+    nextLinkDataPtr = static_cast<EgLinkWidget*> (dataNode.getNextInLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
+    while (nextLinkDataPtr)
+    {
+        nodeWidgetTmp = getNodeWidget(nextLinkDataPtr-> nodeIDTo);
+        if (nextLinkDataPtr-> portSideTo == portSideNorth || nextLinkDataPtr-> portSideTo == portSideSouth)
+            nextLinkDataPtr-> sideCoordToOrig = nextLinkDataPtr-> sideCoordToOrig * nodeWidgetTmp->nodeRect.size.origW / oldW;
+        else
+            nextLinkDataPtr-> sideCoordToOrig = nextLinkDataPtr-> sideCoordToOrig * nodeWidgetTmp->nodeRect.size.origH / oldH;
+        // nextLinkDataPtr-> alignToGrid(nextLinkDataPtr-> sideCoordToOrig); // FIXME check ajust
+        alignToGrid(nextLinkDataPtr-> sideCoordFromOrig, gridSizeOrig, globalIndentOrig);
+
+        nodeWidgetTmp-> getLinkPointOrig(nextLinkDataPtr-> portSideTo, nextLinkDataPtr-> sideCoordToOrig, nextLinkDataPtr-> linkPointEnd.origX, nextLinkDataPtr-> linkPointEnd.origY);
+        origToScaledPointCanvas  (nextLinkDataPtr-> linkPointEnd, zoomFactor, layerCanvas.corner);
+
+        UpdateOneDataLink(nextLinkDataPtr);
         prevLinkDataNodePtr = &(graphLinks->linksDataStorage[nextLinkDataPtr-> dataLinkID]);
         nextLinkDataPtr = static_cast<EgLinkWidget*> (dataNode.getNextInLinkSerialPtr(graphLinks->linkBlueprintID, prevLinkDataNodePtr));
     }
@@ -500,20 +430,37 @@ void EgGraphWidget::LoadDataNodes()
     }
     if (! graphNodes-> isConnected)
         graphNodes-> Connect(graphNodes-> nodesSetName, graphDB);
-    if (! graphNodes-> isDataLoaded)
-        graphNodes-> LoadAllNodes();
+    // if (! graphNodes-> isDataLoaded)
+    graphNodes-> LoadAllNodes();
     // graphNodes->nodesContainer-> PrintDataNodesContainer();
+    int calcCanvasW = defaultCanvasW;
+    int calcCanvasH = defaultCanvasH;
+
     for (auto nodesIter : graphNodes-> dataMap) // 17 [first, second], <11 = dataFieldsNames.begin(); fieldsIter != dataFieldsNames.end(); ++fieldsIter) {
     // PrintEgDataNodeFields(*(nodesIter.second));
     {
-        EgNodeWidget* newNodeWidget = static_cast<EgNodeWidget*> (nodesIter.second-> serialDataPtr);
-        // cout << "loaded data node name: " << newNodePtr-> labelText.toStdString() << endl;
+        EgNodeWidget* newNodeWidget = static_cast<EgNodeWidget*> (nodesIter.second-> serialDataPtr);  // created on load as dataNode.serialDataPtr
+        // cout << "LoadDataNodes() loaded data node name: " << newNodeWidget-> labelText.toStdString() << endl;
         newNodeWidget-> setParent(this);
         newNodeWidget-> setWhatsThis(QString("node"));
+        newNodeWidget-> actionMode = actionMode;
 
         moveResizeNodeWidget(newNodeWidget);
         newNodeWidget->show();
-        updateGlobCanvas(newNodeWidget);
+
+        calcCanvasW = std::max (calcCanvasW, newNodeWidget->nodeRect.corner.origX + newNodeWidget->nodeRect.size.origW + globalIndentOrig);
+        calcCanvasH = std::max (calcCanvasH, newNodeWidget->nodeRect.corner.origY + newNodeWidget->nodeRect.size.origH + globalIndentOrig);
+    }
+
+    if (calcCanvasW > defaultCanvasW || calcCanvasH > defaultCanvasH) {
+        layerCanvas.size.origW = calcCanvasW;
+        layerCanvas.size.origH = calcCanvasH;
+        origToScaledLayer(layerCanvas, zoomFactor);
+        graphLayers[layerID]->layerWidth = layerCanvas.size.origW;
+        graphLayers[layerID]->layerHeight = layerCanvas.size.origH;
+        graphLayers.updateWH(layerID, layerCanvas.size.origW, layerCanvas.size.origH);
+        setMinimumSize(layerCanvas.size.origW, layerCanvas.size.origH);
+        repaint();
     }
 }
 
@@ -523,14 +470,17 @@ void EgGraphWidget::LoadLayersInfo()
         graphLayers.ConnectLayers("demoAppLayers", graphDB); // FIXME literal
         graphLayers.LoadLayers();
     }
-
-    /* EgDataNodeIDType layerID;
-    graphLayers.createDetailsLayer(777, layerID, 1000, 600, "layerNodesBlueprint", "layerLinksBlueprint");
-    cout << "LoadLayersInfo() createDetailsLayer ID: " << layerID << endl; */
 }
 
-void EgGraphWidget::   LoadLayer()
+void EgGraphWidget::LoadLayer()
 {
+    // StoreDataNodes();
+    // StoreDataLinks();
+
+    QString nodeLabel;
+    if (dataNodeWidget)
+        nodeLabel = dataNodeWidget->labelText;
+
     clearLayer();
     if(! graphLayers[layerID]) {
         cout << "LoadLayer() layer not found in graphLayers, ID: " << layerID << endl;
@@ -542,17 +492,25 @@ void EgGraphWidget::   LoadLayer()
     layerCanvas.size.origW = graphLayers[layerID]-> layerWidth;
     layerCanvas.size.origH = graphLayers[layerID]-> layerHeight;
 
+    origToScaledLayer(layerCanvas, zoomFactor);
     setMinimumSize(layerCanvas.size.origW, layerCanvas.size.origH);
 
-    cout << "LoadLayer() W: " << layerCanvas.size.origW << " H: " << layerCanvas.size.origH << endl;
+    // cout << "LoadLayer() W: " << dec << layerCanvas.size.origW << " H: " << layerCanvas.size.origH << endl;
     graphLayers[layerID]-> getLayerNodes(graphNodes, loadNodeObjectFromDb, storeNodeObjectToDb);
-    cout << "LoadLayer() graphNodes: " << graphNodes-> nodesSetName << endl;
+    // cout << "LoadLayer() graphNodes: " << graphNodes-> nodesSetName << endl;
     LoadDataNodes();
     graphLayers[layerID]-> getLayerLinks(graphLinks, loadLinkObjectFromDb, storeLinkObjectToDb);
     LoadDataLinks();
 
-    QString numStr = QString::number(layerID);
-    myForm->ui->layerNumLabel-> setText(numStr);
+    // QString numStr = QString::number(layerID);
+    // myForm->ui->layerNumLabel-> setText(numStr);
+
+    if (parentLayerID)
+        myForm->setWindowTitle("Details of " + nodeLabel);
+    else
+        myForm->setWindowTitle("Top layer");
+
+    repaint();
 }
 
 void EgGraphWidget::LayerUp()
@@ -560,10 +518,13 @@ void EgGraphWidget::LayerUp()
     if (layerID > 1) {
         StoreDataNodes();
         StoreDataLinks();
-        layerID = parentLayerID; // FIXME STUB
+        layerID = parentLayerID;
         LoadLayer();
-        QString numStr = QString::number(layerID);
-        myForm->ui->layerNumLabel-> setText(numStr);
+        // QString numStr = QString::number(layerID);
+        // myForm->ui->layerNumLabel-> setText(numStr);
+        for (auto iter: deleteWidgets) // delayed node widgets cleanup
+            delete iter;
+        deleteWidgets.clear();
     }
     // cout << "LayerUp() : " << layerNum << endl;
 }
@@ -589,12 +550,13 @@ void EgGraphWidget::LoadDataLinks()
     }
     if (! graphLinks-> linksDataStorage.isConnected)
         graphLinks->ConnectLinks(graphLinks->linkNameShort, graphDB);
-    if (! graphLinks-> linksDataStorage.isDataLoaded) {
+    // if (! graphLinks-> linksDataStorage.isDataLoaded) {
         // cout << "LoadDataLinks() LoadAllNodes" << endl;
         // graphLinks-> linksDataStorage.nodesContainer-> PrintNodesChain();
-        graphLinks-> linksDataStorage.LoadAllNodes();
-        graphLinks-> ResolveNodesIDsToPtrs(*graphNodes, *graphNodes);
-    }
+    graphLinks-> clear();
+    graphLinks-> linksDataStorage.LoadAllNodes();
+    graphLinks-> ResolveNodesIDsToPtrs(*graphNodes, *graphNodes);
+    // }
     for (auto linksIter : graphLinks-> dataMap)
     {
         EgLinkWidget* newLinkWidget = static_cast<EgLinkWidget*> (linksIter.second-> serialDataPtr);
@@ -607,23 +569,31 @@ void EgGraphWidget::LoadDataLinks()
 
 inline void EgGraphWidget::ShowDataLink(EgLinkWidget* newLinkWidget)
 {
-    newLinkWidget-> startPointScaled = newLinkWidget-> startPointOrig;
-    newLinkWidget-> endPointScaled   = newLinkWidget-> endPointOrig;
+    EgNodeWidget* nodeWidgetTmp = getNodeWidget(newLinkWidget-> nodeIDFrom);
+    nodeWidgetTmp-> getLinkPointOrig(newLinkWidget-> portSideFrom, newLinkWidget-> sideCoordFromOrig, newLinkWidget-> linkPointStart.origX, newLinkWidget-> linkPointStart.origY);
+    // cout << "ShowDataLink() pointFrom stored: " << dec << newLinkWidget-> linkPointStart.origX << " : "  << newLinkWidget-> linkPointStart.origY << endl;
+    // cout << "ShowDataLink() pointFrom calc:   " << pointOrigX << " : "  << pointOrigY << endl;
+    resetToOrigPoint(newLinkWidget-> linkPointStart);
 
-    newLinkWidget->calcLinkWidgetRect(zoomFactor);
-    moveResizeLinkWidget(newLinkWidget); // , newcornerX, newcornerY, newrectW, newrectH);
+    nodeWidgetTmp = getNodeWidget (newLinkWidget-> nodeIDTo);
+    nodeWidgetTmp-> getLinkPointOrig(newLinkWidget-> portSideTo, newLinkWidget-> sideCoordToOrig, newLinkWidget-> linkPointEnd.origX, newLinkWidget-> linkPointEnd.origY);
+    // cout << "ShowDataLink() pointTo stored: " << newLinkWidget-> linkPointEnd.origX << " : "  << newLinkWidget-> linkPointEnd.origY << endl;
+    // cout << "ShowDataLink() pointTo calc:   " << pointOrigX << " : "  << pointOrigY << endl;
+    resetToOrigPoint(newLinkWidget-> linkPointEnd);
+
+    newLinkWidget-> calcLinkWidgetRect(zoomFactor, scaledGlobalIndent);
+    moveResizeLinkWidget(newLinkWidget);
 
     newLinkWidget-> lower();
     newLinkWidget-> show();
-    // cout << "ShowDataLink() dataLinkID: " << newIcon->dataLinkID << endl;
 }
 
 inline void EgGraphWidget::UpdateOneDataLink(EgLinkWidget* updLinkInfo)
 {
-    updLinkInfo-> calcLinkWidgetRect(zoomFactor);
+    updLinkInfo-> calcLinkWidgetRect(zoomFactor, scaledGlobalIndent);
     moveResizeLinkWidget(updLinkInfo); // , newcornerX, newcornerY, newrectW, newrectH);
     graphLinks-> MarkUpdatedLink(updLinkInfo-> dataLinkID);
-    cout << "UpdateOneDataLink() dataLinkID: " << updLinkInfo-> dataLinkID << endl;
+    // cout << "UpdateOneDataLink() dataLinkID: " << updLinkInfo-> dataLinkID << endl;
 }
 
 void EgGraphWidget::StoreDataLinks()
@@ -636,45 +606,29 @@ void EgGraphWidget::StoreDataLinks()
 
 void EgGraphWidget::paintEvent(QPaintEvent* event)
 {
-    // cout << "paintEvent() globCanvasScaledCorner: " << globCanvasScaledCorner.x() << " : " << globCanvasScaledCorner.y()
-    //      << " : " << globCanvasScaledWidth << " : " << globCanvasScaledHeight << " showCanvasRectangle: " << showCanvasRectangle << endl;
+    // cout << "paintEvent() layerCanvas: " << layerCanvas.corner.scaledX << " : " << layerCanvas.corner.scaledY << endl;
     // if (zoomFactor)
     {
-        QPainter globPainter(this); // glob canvas frame
-        globPainter.setPen(Qt::darkGray);
-        globPainter.drawRect(layerCanvas.corner.scaledX, layerCanvas.corner.scaledY, layerCanvas.size.scaledW, layerCanvas.size.scaledH);
-        globPainter.end();
+        globPainter-> begin(this);
+        globPainter-> setPen(Qt::darkGray);
+        globPainter-> setPen(Qt::DotLine);
+        globPainter-> drawRect(layerCanvas.corner.scaledX, layerCanvas.corner.scaledY, layerCanvas.size.scaledW, layerCanvas.size.scaledH);
+        globPainter-> end();
     }
 }
 
 inline void EgGraphWidget::connectPressAction(QPoint clickPoint, QDrag* dragPtr)
 {
     arrowIcon-> hide();
-    QPoint portPoint;
-    QPoint inNodeClickPoint = clickPoint - dataNodeWidget->pos();
-    dragPtr-> setHotSpot(inNodeClickPoint);
+    dataNodeWidget-> calcPortPointOrig(clickPoint, zoomFactor, arrowIcon->portSideFrom, arrowIcon->sideCoordFromOrig, arrowIcon-> linkPointStart.origX, arrowIcon-> linkPointStart.origY);
+    origToScaledPointCanvas  (arrowIcon-> linkPointStart, zoomFactor, layerCanvas.corner);
 
-    dataNodeWidget->calcPortPoint(arrowIcon->portSideFrom, inNodeClickPoint, portPoint);
-    dragStart = dataNodeWidget->pos() + portPoint;
-
-    arrowIcon->startPointScaled = dragStart;
-
-    QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
-    arrowIcon->calcScaledToOrigStart(zoomFactor, tmpPoint);
-    arrowIcon->lineType = directConnect;
-
-    QDataStream dataStream(itemData, QIODevice::WriteOnly);
-    dataStream << inNodeClickPoint;
-
-    QMimeData *mimeData = new QMimeData;
+    QMimeData *mimeData = new QMimeData; // system dragdrop squats
     mimeData->setData("application/x-dnditemdata", *itemData);
-
     dragPtr-> setMimeData(mimeData);
-
     myForm-> dragDropAction = true;
     dragPtr-> exec(Qt::MoveAction);
     myForm-> dragDropAction = false;
-//    cout << "connectPressAction() exit" << endl;
 }
 
 inline void EgGraphWidget::movePressAction(QPoint clickPoint, QDrag* dragPtr)
@@ -700,8 +654,8 @@ inline void EgGraphWidget::movePressAction(QPoint clickPoint, QDrag* dragPtr)
     }
     else // resize
     {
-        oldWidgetWidth  = dataNodeWidget-> width();
-        oldWidhetHeight = dataNodeWidget-> height();
+        oldNodeWidthOrig  = dataNodeWidget-> nodeRect.size.origW;
+        oldNodeHeightOrig = dataNodeWidget-> nodeRect.size.origH;
         // cout << "movePressAction() oldWidgetWidth: "  << oldWidgetWidth << " oldWidhetHeight: " << oldWidhetHeight << endl;
         QDataStream dataStream(itemData, QIODevice::WriteOnly);
         dataStream << nodeOffset;
@@ -728,26 +682,26 @@ inline void EgGraphWidget::movePressAction(QPoint clickPoint, QDrag* dragPtr)
 void EgGraphWidget::clearEditLink()
 {
     if (linkEditSelected) {
-        linkEditSelected-> lower();
         linkEditSelected-> setAcceptDrops(false);
         linkEditSelected-> isEditSelected = false;
-        linkEditSelected-> repaint();
+        linkEditSelected-> lower();
+        // linkEditSelected-> repaint();
         linkEditSelected = nullptr;
     }
 }
 
-inline void EgGraphWidget::linkEditPressAction(QPoint clickPoint)
+inline void EgGraphWidget::linkEditPressAction()
 {
-    // cout << "linkEditPressAction() (start) node ID: "  << dataNodeWidget->dataNodeID << endl;
-    // PrintResolvedLinks(graphNodes[dataNodeWidget->dataNodeID]);
     clearEditLink();
     EgLinkWidget* firstLinkDataPtr =
         static_cast<EgLinkWidget*> ((*graphNodes)[dataNodeWidget->dataNodeID].getNextOutLinkSerialPtr(graphLinks->linkBlueprintID, nullptr));
 
     if (firstLinkDataPtr)
+        cout << "linkEditPressAction() first link: " << firstLinkDataPtr-> dataLinkID << endl;
+
+    if (firstLinkDataPtr) // out link found
     {
         markEditedLink(firstLinkDataPtr, true);
-        // cout << "linkEditPressAction() first OUT link data ptr found, ID: "  << firstLinkDataPtr-> dataLinkID << endl;
         return;
     }
 
@@ -756,7 +710,6 @@ inline void EgGraphWidget::linkEditPressAction(QPoint clickPoint)
     if (firstLinkDataPtr)
     {
         markEditedLink(firstLinkDataPtr, false);
-        // cout << "linkEditPressAction() first IN link data ptr found, ID: "  << firstLinkDataPtr-> dataLinkID << endl;
         return;
     }
 }
@@ -791,63 +744,84 @@ void EgGraphWidget::nodeDeletePressAction()
 
 void EgGraphWidget::detailsLayerPressAction()
 {
-    if (! dataNodeWidget-> detailsLayerID) { // check if details layer exists
-            // create new details layer
-        graphLayers.createDetailsLayer(dataNodeWidget->dataNodeID, dataNodeWidget-> detailsLayerID, layerID, 1000, 800, graphNodes->nodesSetName, "layerNodesBlueprint", "layerLinksBlueprint");
-            cout << " detailsLayerPressAction() node ID: " << dataNodeWidget->dataNodeID << " new layer ID: " << dataNodeWidget-> detailsLayerID
-                 << " parent layer ID: " << layerID << endl;
-            // store detailsLayerID and parent ID
+    /* if (dataNodeWidget)
+        cout << " detailsLayerPressAction() node ID: " << dataNodeWidget->dataNodeID << " details layer ID: " << dataNodeWidget-> detailsLayerID
+             << " layerID: " << layerID << endl; */
+    if (dataNodeWidget && ! dataNodeWidget-> detailsLayerID) { // check if details layer exists
+        QMessageBox msgBox;
+        msgBox.setText("Create new details of the node layer?");
+        msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
+        msgBox.setDefaultButton(QMessageBox::Cancel); // Set Cancel as the default focused button
+        if (msgBox.exec() != QMessageBox::Ok)
+            return;
+
+        // create new details layer
+        graphLayers.createDetailsLayer(dataNodeWidget->dataNodeID, dataNodeWidget-> detailsLayerID, layerID, defaultCanvasW, defaultCanvasH, // FIXME literals
+                                       graphNodes->nodesSetName, "layerNodesBlueprint", "layerLinksBlueprint");
+        cout << " detailsLayerPressAction() node ID: " << dataNodeWidget->dataNodeID << " new layer ID: " << dataNodeWidget-> detailsLayerID
+             << " parent layer ID: " << layerID << endl;
+        // store detailsLayerID and parent ID
         graphNodes-> MarkUpdatedDataNode(dataNodeWidget->dataNodeID);
         graphNodes-> Store();
     }
-        // open layer
-    // parentLayerID = layerID;
+    // if (dataNodeWidget)
+    StoreDataNodes();
+    StoreDataLinks();
     layerID = dataNodeWidget-> detailsLayerID;
     LoadLayer();
+
 }
 
 void EgGraphWidget::mousePressEvent(QMouseEvent *event)
 {
-    resizeMode = false;
-    dataNodeWidget = static_cast<EgNodeWidget*>(childAt(event->pos()));       // check if click on a widget
-    if (!dataNodeWidget || (dataNodeWidget-> whatsThis() != QString("node"))) // widget is not node
-    {
-        dataNodeWidget = nullptr;
-        return;
-    }
-
-    if (actionMode == nodeDeleteMode) {
-        nodeDeletePressAction();
-        return;
-    }
-
-    if (actionMode == linkEditMode) {
-        linkEditPressAction(event->pos());
-        return;
-    }
-
-    if (actionMode == detailsLayerMode) {
-        detailsLayerPressAction();
-        return;
-    }
-
-    QDrag* drag = new QDrag(this);
-    dragStart   = event->pos();
-
-    if (actionMode == connectMode) // mode select
-        connectPressAction(event->pos(), drag);
-    else if (actionMode == moveMode)
-        movePressAction(event->pos(), drag);
-
-    itemData-> clear(); // cleanup
-    if (drag) delete drag;
+    resizeMode =     false;
     dataNodeWidget = nullptr;
+    QDrag* drag    { nullptr };
+    QWidget* checkWidget = childAt(event->pos());       // check if click on a widget
+    // if (checkWidget)
+    //    cout << "mousePressEvent() widget: " << checkWidget-> whatsThis().toStdString() << endl;
+    if (checkWidget && (checkWidget-> whatsThis() == QString("node"))) // widget is node
+    {
+        dataNodeWidget = static_cast<EgNodeWidget*> (checkWidget);
+        dataNodeWidget-> actionMode = actionMode;
+        if (event->button() == Qt::LeftButton) {
+            switch (actionMode) {
+            case nodeDeleteMode:   nodeDeletePressAction(); return;
+            case linkEditMode:     linkEditPressAction(); return;
+            case connectMode: {
+                drag = new QDrag(this);
+                dragStart   = event->pos();
+                connectPressAction(event->pos(), drag); break;
+            }
+            case moveResizeMode: {
+                drag = new QDrag(this);
+                dragStart   = event->pos();
+                movePressAction(event->pos(), drag); break;
+            }
+            }
+            itemData-> clear(); // cleanup
+            delete drag;
+            dataNodeWidget = nullptr;
+            return;
+        } else if (event->button() == Qt::RightButton) {
+            // actionMode = detailsLayerMode;
+            detailsLayerPressAction();
+            return;
+        }
+    } else if (event->button() == Qt::RightButton) {
+        // actionMode = detailsLayerMode;
+        if (! checkWidget) // flaky bug with link click, seems events queue issue
+            LayerUp();
+    } else
+        event->ignore();
+    // QWidget::mousePressEvent(event);
 }
 
 void EgGraphWidget::dragEnterEvent(QDragEnterEvent *event)
-{
-    // cout << "EgGraphWidget dragEnterEvent()" << endl;
-    if (myForm-> dragDropAction) {
+{       
+    // cout << "dragEnterEvent() source is this" << endl;
+    if (myForm-> dragDropAction /* && actionMode == moveResizeMode*/) {
+        if (event->source() == this || actionMode == moveResizeMode)
             event-> acceptProposedAction();
     }
 }
@@ -859,76 +833,52 @@ void EgGraphWidget::dragLeaveEvent(QDragLeaveEvent *event)
     }
 }
 
-
-int EgGraphWidget::calcLinkQuadrant(QPoint startPoint, QPoint currPoint)
-{
-    if (currPoint.x() >= startPoint.x() && currPoint.y() <= startPoint.y())
-        return 0;
-    if (currPoint.x() >= startPoint.x() && currPoint.y() >= startPoint.y())
-        return 1;
-    if (currPoint.x() <= startPoint.x() && currPoint.y() >= startPoint.y())
-        return 2;
-    return 3;
-}
-
 inline void EgGraphWidget::connectDragAction(QPoint dragPoint)
 {
-    QPoint itemSize = dragPoint - dragStart;
-    int itemSizeW = max(std::abs(itemSize.x()), minLinkWidgetSize) + scaledGlobalIndent*2;
-    int itemSizeH = max(std::abs(itemSize.y()), minLinkWidgetSize) + scaledGlobalIndent*2;
+    arrowIcon-> hide();
 
-    arrowIcon-> resize ( itemSizeW,  itemSizeH);
-    arrowIcon->endPointOrig = dragPoint;
-    arrowIcon->endPointScaled = dragPoint;
+    arrowIcon-> linkPointEnd.scaledX = dragPoint.x();
+    arrowIcon-> linkPointEnd.scaledY = dragPoint.y();
 
-    arrowIcon-> tmpLinkQuadrant = calcLinkQuadrant(dragStart, dragPoint);
-    // cout << "tmpLinkQuadrant: " << arrowIcon-> tmpLinkQuadrant << endl;
+    arrowIcon-> calcLinkWidgetRect(zoomFactor, scaledGlobalIndent);
+    moveResizeLinkWidget(arrowIcon);
 
-    switch (arrowIcon-> tmpLinkQuadrant) {
-    case 0:
-        arrowIcon-> move (dragStart.x() - scaledGlobalIndent, dragStart.y()-itemSizeH + scaledGlobalIndent);
-        break;
-    case 1:
-        arrowIcon-> move (dragStart.x() - scaledGlobalIndent, dragStart.y() - scaledGlobalIndent);
-        break;
-    case 2:
-        arrowIcon-> move (dragStart.x()-itemSizeW + scaledGlobalIndent, dragStart.y() - scaledGlobalIndent);
-        break;
-    default:
-        arrowIcon-> move (dragStart.x()-itemSizeW + scaledGlobalIndent, dragStart.y()-itemSizeH + scaledGlobalIndent); // + offset);  // event->position().toPoint()            break;
-    }
-
-    arrowIcon->scaledCornerX = arrowIcon->x();
-    arrowIcon->scaledCornerY = arrowIcon->y();
     arrowIcon-> show();
 }
 
-inline void EgGraphWidget::moveDragAction(QPoint dragPoint)
-{   // resize func only
+inline void EgGraphWidget::resizeDragAction(QPoint dragPoint)
+{   // resize only, move use sys drag
     QPoint offset = dragPoint - dragStart;
 
-    offset.setX(offset.x() + oldWidgetWidth);
-    offset.setY(offset.y() + oldWidhetHeight);
+    int scaledW {0};
+    int scaledH {0};
 
-    int defNewNodeWidthScaled   = defNewNodeWidth * (10 - zoomFactor)/10;
-    int defNewNodeHeightScaled  = defNewNodeHeight * (10 - zoomFactor)/10;
+    origToScaledScalar (oldNodeWidthOrig, scaledW, zoomFactor);
+    origToScaledScalar (oldNodeHeightOrig, scaledH, zoomFactor);
+
+    offset.setX(offset.x() + scaledW);
+    offset.setY(offset.y() + scaledH);
+
+    int defNewNodeWidthScaled   {0};
+    int defNewNodeHeightScaled  {0};
+
+    origToScaledScalar (defNewNodeWidth, defNewNodeWidthScaled, zoomFactor);
+    origToScaledScalar (defNewNodeHeight, defNewNodeHeightScaled, zoomFactor);
 
     if (offset.x() < defNewNodeWidthScaled)
         offset.setX(defNewNodeWidthScaled);
     if (offset.y() < defNewNodeHeightScaled)
         offset.setY(defNewNodeHeightScaled);
 
-    if (dataNodeWidget-> scaledRectW != offset.x() && dataNodeWidget->scaledRectH != offset.y())
+    if (dataNodeWidget-> nodeRect.size.scaledW != offset.x() && dataNodeWidget->nodeRect.size.scaledH != offset.y())
     {
-        dataNodeWidget-> scaledRectW   = offset.x();
-        dataNodeWidget-> scaledRectH   = offset.y();
+        dataNodeWidget-> nodeRect.size.scaledW  = offset.x();
+        dataNodeWidget-> nodeRect.size.scaledH  = offset.y();
 
-        dataNodeWidget-> origRectW = dataNodeWidget->scaledRectW * 10/(10 - zoomFactor);
-        dataNodeWidget-> origRectH = dataNodeWidget->scaledRectH * 10/(10 - zoomFactor);
+        scaledToOrigSize   (dataNodeWidget-> nodeRect.size, zoomFactor);
 
         graphNodes-> MarkUpdatedDataNode(dataNodeWidget->dataNodeID);
-
-        dataNodeWidget-> resize(dataNodeWidget->scaledRectW,  dataNodeWidget->scaledRectH);  // FIXME update global canvas
+        dataNodeWidget-> resize(dataNodeWidget->nodeRect.size.scaledW,  dataNodeWidget->nodeRect.size.scaledH);
     }
 }
 
@@ -937,7 +887,7 @@ void EgGraphWidget::dragMoveEvent(QDragMoveEvent *event)
     if ((actionMode == connectMode) && myForm-> dragDropAction) // connect nodes drag
         connectDragAction(event->position().toPoint());
     else if (resizeMode && myForm-> dragDropAction && dataNodeWidget) // node resize drag // ((event->source() == this)))
-        moveDragAction(event->position().toPoint());
+        resizeDragAction(event->position().toPoint());
 }
 
 inline void EgGraphWidget::connectDropAction(QPoint dropPoint)
@@ -945,62 +895,41 @@ inline void EgGraphWidget::connectDropAction(QPoint dropPoint)
     arrowIcon-> hide();
     arrowIcon-> lower();
 
-    QWidget* targetWidget = childAt(dropPoint);
-    if (targetWidget)
+    QWidget* checkWidget = childAt(dropPoint);       // check if click on a widget
+    if (! checkWidget || (checkWidget-> whatsThis() != QString("node"))) // widget is not node
+        return;
+    targetNodeWidget = static_cast<EgNodeWidget*> (checkWidget);
+    if (targetNodeWidget && dataNodeWidget && targetNodeWidget != dataNodeWidget)
     {
-        // cout << "targetWidget whatsThis(): " << targetWidget->whatsThis().toStdString() << endl;
-        targetNodeWidget = static_cast<EgNodeWidget*>(targetWidget);
+        EgLinkWidget* newLinkWidget = new EgLinkWidget(this);
+        newLinkWidget-> setWhatsThis(QString("link"));
+        newLinkWidget-> setAttribute(Qt::WA_DeleteOnClose);
 
-        if (targetNodeWidget && dataNodeWidget && (targetNodeWidget-> whatsThis() == QString("node")) && (targetNodeWidget != dataNodeWidget)) // check for valid node and port to connect
-        {
+        newLinkWidget->nodeIDFrom = dataNodeWidget->dataNodeID;
+        newLinkWidget->nodeIDTo = targetNodeWidget->dataNodeID;
 
-            targetNodeWidget-> repaint(); // show port
+        newLinkWidget-> linkPointStart = arrowIcon-> linkPointStart; // copy from dynamic link
+        newLinkWidget-> sideCoordFromOrig   = arrowIcon-> sideCoordFromOrig;
+        // newLinkWidget-> sideCoordFromScaled = arrowIcon-> sideCoordFromScaled;
 
-            EgLinkWidget* newLinkWidget = new EgLinkWidget(this);
-            newLinkWidget-> setWhatsThis(QString("link"));
-            newLinkWidget-> setAttribute(Qt::WA_DeleteOnClose);
+        targetNodeWidget-> calcPortPointOrig(dropPoint, zoomFactor, newLinkWidget->portSideTo, newLinkWidget->sideCoordToOrig,
+                                            newLinkWidget-> linkPointEnd.origX, newLinkWidget-> linkPointEnd.origY);
+        origToScaledPointCanvas  (newLinkWidget-> linkPointEnd, zoomFactor, layerCanvas.corner);
 
-            newLinkWidget->nodeIDFrom = dataNodeWidget->dataNodeID;
-            newLinkWidget->nodeIDTo = targetNodeWidget->dataNodeID;
+        newLinkWidget-> portSideFrom = arrowIcon->portSideFrom;
+        newLinkWidget-> calcLinkVisualType();
 
-            newLinkWidget->startPointOrig   = arrowIcon->startPointOrig;
-            newLinkWidget->startPointScaled = arrowIcon->startPointScaled;
+        *graphLinks << new EgDataNode(graphLinks->dataNodeBlueprint, (void*)newLinkWidget); // newNode
+        newLinkWidget->dataLinkID = graphLinks->getAddedNodeID();
 
-            QPoint endPortPoint;
-            QPoint inNodeClickPoint = dropPoint - targetNodeWidget->pos();
-            targetNodeWidget->calcPortPoint(newLinkWidget->portSideTo, inNodeClickPoint, endPortPoint);
+        graphLinks-> AddLinkPtrsToNodes(graphLinks-> linksDataStorage[newLinkWidget->dataLinkID],
+                                       (*graphNodes)[dataNodeWidget->dataNodeID], (*graphNodes)[targetNodeWidget->dataNodeID]);
 
-            newLinkWidget->portSideFrom = arrowIcon->portSideFrom;
-            newLinkWidget->calcLinkVisualType();
-
-            newLinkWidget->endPointScaled = targetNodeWidget->pos() + endPortPoint;
-            QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
-            newLinkWidget->calcScaledToOrigEnd(zoomFactor, tmpPoint);
-            // cout << "connectDropAction() targetNodeWidget->pos(): " << targetNodeWidget->pos().x() << " : " << targetNodeWidget->pos().y()  << endl;
-            if (newLinkWidget->portSideTo == portSideNorth || newLinkWidget->portSideTo == portSideNorth) {
-                int tmpX = newLinkWidget-> endPointOrig.x();
-                adjustToGridX (tmpX);
-                newLinkWidget-> endPointOrig.setX(tmpX);
-            } else {
-                int tmpY = newLinkWidget-> endPointOrig.y();
-                adjustToGridY (tmpY);
-                newLinkWidget-> endPointOrig.setY(tmpY);
-            }
-
-            *graphLinks << new EgDataNode(graphLinks->dataNodeBlueprint, (void*)newLinkWidget); // newNode
-            newLinkWidget->dataLinkID = graphLinks->getAddedNodeID();
-
-            graphLinks-> AddLinkPtrsToNodes(graphLinks-> linksDataStorage[newLinkWidget->dataLinkID],
-                                            (*graphNodes)[dataNodeWidget->dataNodeID], (*graphNodes)[targetNodeWidget->dataNodeID]);
-
-            newLinkWidget->calcLinkWidgetRect(zoomFactor);
-            newLinkWidget-> lower();
-            moveResizeLinkWidget(newLinkWidget); //, newIcon->cornerX, newIcon->cornerY, newIcon->rectW, newIcon->rectH);
-            newLinkWidget-> show();
-            // cout << "connectDropAction() dataLinkID: " << newIcon->dataLinkID << endl;
-            return;
-
-        }
+        newLinkWidget->calcLinkWidgetRect(zoomFactor, scaledGlobalIndent);
+        moveResizeLinkWidget(newLinkWidget);
+        newLinkWidget-> lower();
+        newLinkWidget-> show();
+        // cout << "connectDropAction() dataLinkID: " << newIcon->dataLinkID << endl;
     }
 }
 
@@ -1009,77 +938,78 @@ inline void EgGraphWidget::moveDropAction(QPoint dropPoint, bool newNode)
     // cout << "resizeMode: " << resizeMode << " newNode: " << newNode << endl;
     if (! resizeMode)
     {
-        dropPoint.setX(std::max (dropPoint.x(), layerCanvas.corner.scaledX + scaledGlobalIndent));
+        dropPoint.setX(std::max (dropPoint.x(), layerCanvas.corner.scaledX + scaledGlobalIndent)); // FIXME expand canvas to left
         dropPoint.setY(std::max (dropPoint.y(), layerCanvas.corner.scaledY + scaledGlobalIndent));
 
         if (newNode) // new node dragged-dropped
         {
-            EgNodeWidget* newNodeWidget = new EgNodeWidget(this);
-            // newNodeWidget->setAttribute(Qt::WA_DeleteOnClose);
-            newNodeWidget-> setWhatsThis(QString("node"));
+            dataNodeWidget = new EgNodeWidget(this); // new node widget by common link
+            dataNodeWidget-> setWhatsThis(QString("node"));
+            dataNodeWidget-> fillColor = newFillColor;
 
-            newNodeWidget->origRectW   = defNewNodeWidth;
-            newNodeWidget->origRectH   = defNewNodeHeight;
-
-            newNodeWidget->scaledCornerX = dropPoint.x();
-            newNodeWidget->scaledCornerY = dropPoint.y();
+            dataNodeWidget->nodeRect.size.origW   = defNewNodeWidth;
+            dataNodeWidget->nodeRect.size.origH   = defNewNodeHeight;
 
             if (zoomFactor)
             {
-                QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
-                QPoint deltaP = dropPoint - tmpPoint;
-                newNodeWidget->origCornerX = deltaP.x() * 10/(10 - zoomFactor);
-                newNodeWidget->origCornerY = deltaP.y() * 10/(10 - zoomFactor);
-
-                newNodeWidget->scaledRectW   = newNodeWidget->origRectW * (10 - zoomFactor)/10;
-                newNodeWidget->scaledRectH   = newNodeWidget->origRectH * (10 - zoomFactor)/10;
+                // QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
+                // QPoint deltaP = dropPoint - tmpPoint;
+                dataNodeWidget->nodeRect.corner.scaledX = dropPoint.x();
+                dataNodeWidget->nodeRect.corner.scaledY = dropPoint.y();
+                scaledToOrigPointCanvas  (dataNodeWidget->nodeRect.corner, zoomFactor, layerCanvas.corner);
+                alignToGrid(dataNodeWidget-> nodeRect.corner.origX, gridSizeOrig, globalIndentOrig);
+                alignToGrid(dataNodeWidget-> nodeRect.corner.origY, gridSizeOrig, globalIndentOrig);
+                origToScaledPointCanvas  (dataNodeWidget->nodeRect.corner, zoomFactor, layerCanvas.corner);
+                origToScaledSize   (dataNodeWidget->nodeRect.size, zoomFactor);
             } else {
-                adjustPointToGrid(dropPoint);
-                newNodeWidget->origCornerX = dropPoint.x();
-                newNodeWidget->origCornerY = dropPoint.y();
-                newNodeWidget->scaledRectW = defNewNodeWidth;
-                newNodeWidget->scaledRectH = defNewNodeHeight;
+                dataNodeWidget->nodeRect.corner.origX = dropPoint.x();
+                dataNodeWidget->nodeRect.corner.origY = dropPoint.y();
+                alignToGrid(dataNodeWidget-> nodeRect.corner.origX, gridSizeOrig, globalIndentOrig);
+                alignToGrid(dataNodeWidget-> nodeRect.corner.origY, gridSizeOrig, globalIndentOrig);
+                resetToOrigRect(dataNodeWidget->nodeRect);
             }
 
-            *graphNodes << new EgDataNode(graphNodes-> dataNodeBlueprint, (void*)newNodeWidget); // newNode
-            newNodeWidget-> dataNodeID = graphNodes->getAddedNodeID();
-            cout << "moveDropAction() New node added at " ;
-            cout << "cornerX: " << std::dec << newNodeWidget->scaledCornerX << " cornerY: " << newNodeWidget->scaledCornerY << " dataNodeID: " << newNodeWidget->dataNodeID << endl;
-            moveResizeNodeWidget(newNodeWidget);
-            newNodeWidget->show();
-            dataNodeWidget = newNodeWidget; // for canvas recalc
+            *graphNodes << new EgDataNode(graphNodes-> dataNodeBlueprint, (void*)dataNodeWidget); // new db Node
+            dataNodeWidget-> dataNodeID = graphNodes->getAddedNodeID();
+            dataNodeWidget-> labelText = "Node " + QString::number(dataNodeWidget-> dataNodeID);
+            (*graphNodes)[dataNodeWidget->dataNodeID]["name"] << dataNodeWidget-> labelText;      // set name for table form
+            // cout << "moveDropAction() New node added at " ;
+            // cout << "cornerX: " << std::dec << dataNodeWidget->scaledCornerX << " cornerY: " << dataNodeWidget->scaledCornerY << " dataNodeID: " << dataNodeWidget->dataNodeID << endl;
+            moveResizeNodeWidget(dataNodeWidget);
+            dataNodeWidget->show();
         } else { // old node moved
             if (dataNodeWidget)
             {
-                dataNodeWidget-> nodeShowCorner = false;
-                QPoint oldCorner(dataNodeWidget->scaledCornerX, dataNodeWidget->scaledCornerY);
+                dataNodeWidget-> nodeResizeMode = false;
+                QPoint oldCorner(dataNodeWidget->nodeRect.corner.scaledX, dataNodeWidget->nodeRect.corner.scaledY);
                 QPoint deltaPoint = dropPoint - oldCorner;
                 // cout << "deltaPoint: " << std::dec << deltaPoint.x() << " : " << deltaPoint.y() << endl;
-                dataNodeWidget->scaledCornerX = dropPoint.x();
-                dataNodeWidget->scaledCornerY = dropPoint.y();
-                QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
-                dataNodeWidget->calcScaledToOrig(zoomFactor, tmpPoint);
-                adjustToGridX (dataNodeWidget-> origCornerX);
-                adjustToGridY (dataNodeWidget-> origCornerY);
-                dataNodeWidget->calcOrigToScaled(zoomFactor, tmpPoint);
+                dataNodeWidget->nodeRect.corner.scaledX = dropPoint.x();
+                dataNodeWidget->nodeRect.corner.scaledY = dropPoint.y();
+                scaledToOrigPointCanvas  (dataNodeWidget->nodeRect.corner, zoomFactor, layerCanvas.corner); // FIXME grid adj
+                // QPoint tmpPoint { layerCanvas.corner.scaledX, layerCanvas.corner.scaledY }; // FIXME STUB
+                // dataNodeWidget->calcScaledToOrig(zoomFactor, tmpPoint);
+                alignToGrid(dataNodeWidget-> nodeRect.corner.origX, gridSizeOrig, globalIndentOrig);
+                alignToGrid(dataNodeWidget-> nodeRect.corner.origY, gridSizeOrig, globalIndentOrig);
+                origToScaledPointCanvas  (dataNodeWidget->nodeRect.corner, zoomFactor, layerCanvas.corner);
+                // dataNodeWidget->calcOrigToScaled(zoomFactor, tmpPoint);
 
-                UpdateLinksAftMove((*graphNodes)[dataNodeWidget->dataNodeID], deltaPoint);
-
-                dataNodeWidget-> move(QPoint(dataNodeWidget->scaledCornerX, dataNodeWidget->scaledCornerY)); // FIXME check: update global canvas
+                dataNodeWidget-> move(QPoint(dataNodeWidget->nodeRect.corner.scaledX, dataNodeWidget->nodeRect.corner.scaledY)); // FIXME check: update global canvas
                 graphNodes-> MarkUpdatedDataNode(dataNodeWidget->dataNodeID);
+                UpdateLinksAftMove((*graphNodes)[dataNodeWidget->dataNodeID], deltaPoint);
             }
         }
     } else { // resize
         if (dataNodeWidget)
         {
             // cout << " moveDropAction() resize: " << endl;
-            int oldOrigW = oldWidgetWidth * 10/(10 - zoomFactor);
-            int oldOrigH = oldWidhetHeight * 10/(10 - zoomFactor);
-            UpdateLinksAftResize((*graphNodes)[dataNodeWidget->dataNodeID], oldOrigW, oldOrigH);
+            // int oldOrigW = oldNodeWidthOrig * 10/(10 - zoomFactor);
+            // int oldOrigH = oldNodeHeightOrig * 10/(10 - zoomFactor);
+            UpdateLinksAftResize((*graphNodes)[dataNodeWidget->dataNodeID], oldNodeWidthOrig, oldNodeHeightOrig);
             resizeMode = false;
         }
     }
-    // calcOuterCorner(); // update canvas size
+    updateLayerCanvas(); // update canvas size
 }
 
 void EgGraphWidget::dropEvent(QDropEvent *event)
@@ -1109,23 +1039,25 @@ void EgGraphWidget::dropEvent(QDropEvent *event)
             event->ignore();
             return;
         }
+
+        bool newNode = (event->source() != this); // drag from new nodes panel
+
         if (! resizeMode) // move node as picture
-            dataStream >> *pixmapTmp >> dragStartPoint;
+            if (newNode)
+                dataStream >> *pixmapTmp >> dragStartPoint >> newFillColor;
+            else
+                dataStream >> *pixmapTmp >> dragStartPoint;
         else
             dataStream >> dragStartPoint;
 
         QPoint dropPoint = event->position().toPoint() - dragStartPoint;
         if (dropPoint.x() < 0)
-            dropPoint.setX(scaledGlobalIndent); // FIXME
+            dropPoint.setX(scaledGlobalIndent);
 
         if (dropPoint.y() < 0)
             dropPoint.setY(scaledGlobalIndent);
 
-        bool newNode = (event->source() != this);
         moveDropAction(dropPoint, newNode);
-
-        if (dataNodeWidget)
-            updateGlobCanvas(dataNodeWidget);
 
         event->acceptProposedAction();
     }
@@ -1135,18 +1067,20 @@ void EgGraphWidget::dropEvent(QDropEvent *event)
 
 void EgGraphWidget::mouseDoubleClickEvent(QMouseEvent *event)
 {
-    // if (! (actionMode == moveMode))
-    //    return;
-    dataNodeWidget = static_cast<EgNodeWidget*>(childAt(event->position().toPoint())); // check if click to a node widget
-    if (!dataNodeWidget)
+    QWidget* checkWidget = childAt(event->pos());       // check if click on a widget
+    if (! checkWidget || (checkWidget-> whatsThis() != QString("node"))) // widget is not node
         return;
-    // cout << " Double click at node " << dataNode->labelText.toStdString() << endl;
+    dataNodeWidget = static_cast<EgNodeWidget*> (checkWidget);
+    // cout << " Double click at node " << dataNodeWidget->labelText.toStdString() << endl;
     if (! nodeForm)
-        nodeForm = new NodeForm(this);
+        nodeForm = new NodeForm(myForm);
 
     dataNodeWidget-> nodeFormOkFlag = false; // reset
+    nodeForm-> GraphWidget = this;
     nodeForm-> dataNodeWidget = dataNodeWidget;
+
     nodeForm-> openNode();
+    nodeForm-> setWindowModality(Qt::WindowModal);
     nodeForm-> show();
 
     if(dataNodeWidget-> nodeFormOkFlag)
@@ -1154,6 +1088,18 @@ void EgGraphWidget::mouseDoubleClickEvent(QMouseEvent *event)
         graphNodes-> MarkUpdatedDataNode(dataNodeWidget-> dataNodeID);
         dataNodeWidget->repaint();
     }
+}
+
+
+void EgGraphWidget::OpenTableForm()
+{
+    if (! tableForm) {
+        tableForm = new NodesTableForm(myForm);
+        tableForm-> GraphWidget = this;
+    }
+    // tableForm-> graphNodes = graphNodes;
+    tableForm-> setWindowModality(Qt::WindowModal);
+    tableForm-> show();
 }
 
 void EgGraphWidget::wheelEvent(QWheelEvent *event)
@@ -1183,69 +1129,95 @@ inline void EgGraphWidget::markEditedLink(EgLinkWidget* nextLinkDataPtr, bool ed
     linkEditSelected = nextLinkDataPtr;
     linkEditSelected-> isEditSelected = true;
     linkEditSelected-> editLinkIsOutLink = editLinkIsOutLink;
+
     int actPortSide; // port side of edited link
     if (editLinkIsOutLink)
         actPortSide = linkEditSelected->portSideFrom;
     else
         actPortSide = linkEditSelected->portSideTo;
+
+    int minCoordForDrag (0);
+    int maxCoordForDrag {0};
+
+    int editMaxCoord {0}; // set anti-freeze temporary link widget size
+    int editMinCoord {0};
+
     if (actPortSide == portSideNorth || actPortSide == portSideSouth)
     {
-        linkEditSelected-> minCoordForDrag = dataNodeWidget-> x();
-        linkEditSelected-> maxCoordForDrag = dataNodeWidget-> x() + dataNodeWidget-> width() - 1;
+        minCoordForDrag = dataNodeWidget-> x();
+        maxCoordForDrag = dataNodeWidget-> x() + dataNodeWidget-> width() - 1;
+        editMaxCoord = std::max<int> (linkEditSelected-> linkRect.corner.scaledX + linkEditSelected-> linkRect.size.scaledW, maxCoordForDrag + scaledGlobalIndent);
+        editMinCoord = std::min<int> (linkEditSelected-> linkRect.corner.scaledX, minCoordForDrag - scaledGlobalIndent);
+        linkEditSelected-> linkRect.corner.scaledX = editMinCoord; // - scaledGlobalIndent;
+        linkEditSelected-> linkRect.size.scaledW = editMaxCoord - editMinCoord;
     } else {
-        linkEditSelected-> minCoordForDrag = dataNodeWidget-> y();
-        linkEditSelected-> maxCoordForDrag = dataNodeWidget-> y() + dataNodeWidget-> height() - 1;
+        minCoordForDrag = dataNodeWidget-> y();
+        maxCoordForDrag = dataNodeWidget-> y() + dataNodeWidget-> height() - 1;
+        editMaxCoord = std::max<int> (linkEditSelected-> linkRect.corner.scaledY + linkEditSelected-> linkRect.size.scaledH, maxCoordForDrag + scaledGlobalIndent);
+        editMinCoord = std::min<int> (linkEditSelected-> linkRect.corner.scaledY, minCoordForDrag - scaledGlobalIndent);
+        linkEditSelected-> linkRect.corner.scaledY = editMinCoord; // - scaledGlobalIndent;
+        linkEditSelected-> linkRect.size.scaledH = editMaxCoord - editMinCoord; // + scaledGlobalIndent;
     }
-    linkEditSelected-> repaint();
+    scaledToOrigRectCanvas(linkEditSelected->linkRect, zoomFactor, layerCanvas.corner);
+    linkEditSelected-> raise();
+    moveResizeLinkWidget(linkEditSelected);
 }
 
 inline void EgGraphWidget::getNextLinkOfNode()
 {
-    // cout << "getNextLinkOfNode() node ID: "  << dataNodeWidget->dataNodeID << endl;
-    EgLinkWidget* nextLinkDataPtr {nullptr};
-    EgDataNode* prevLinkDataPtr {nullptr};
+    if (! linkEditSelected) {
+        cout << "ERROR: getNextLinkOfNode() linkEditSelected is null " << endl;
+        return;
+    }
+    EgLinkWidget* nextLinkWidget {nullptr};
+    EgDataNode* prevLinkDataPtr  {nullptr};
 
     prevLinkDataPtr = &(graphLinks-> linksDataStorage[linkEditSelected-> dataLinkID]);
     EgDataNode& selectedDataNode {(*graphNodes)[dataNodeWidget->dataNodeID]};
 
-    isOutLinkselected = linkEditSelected-> editLinkIsOutLink;
-
-    if (isOutLinkselected) // out links loop
+    if (linkEditSelected-> editLinkIsOutLink) // out links loop
     {
-        nextLinkDataPtr = static_cast<EgLinkWidget*> (selectedDataNode.getNextOutLinkSerialPtr(graphLinks-> linkBlueprintID, prevLinkDataPtr));
-        if (nextLinkDataPtr)
+        nextLinkWidget = static_cast<EgLinkWidget*> (selectedDataNode.getNextOutLinkSerialPtr(graphLinks-> linkBlueprintID, prevLinkDataPtr));
+        if (nextLinkWidget)
         {
-            markEditedLink(nextLinkDataPtr, true);
+            markEditedLink(nextLinkWidget, true);
             return;
         }
-        isOutLinkselected = false; // switch to in links
-        prevLinkDataPtr = nullptr;
+    } else { // in links loop
+        nextLinkWidget = static_cast<EgLinkWidget*> (selectedDataNode.getNextInLinkSerialPtr(graphLinks-> linkBlueprintID, prevLinkDataPtr));
+        if (nextLinkWidget)
+        {
+            markEditedLink(nextLinkWidget, false);
+            return;
+        }
     }
 
-    if (! isOutLinkselected) // in links loop
-    {
-        nextLinkDataPtr = static_cast<EgLinkWidget*> (selectedDataNode.getNextInLinkSerialPtr(graphLinks-> linkBlueprintID, prevLinkDataPtr));
-        if (nextLinkDataPtr)
+    if (linkEditSelected-> editLinkIsOutLink) { // get first link of other type or to loop start
+        nextLinkWidget = static_cast<EgLinkWidget*> (selectedDataNode.getNextInLinkSerialPtr(graphLinks-> linkBlueprintID, nullptr));
+        if (nextLinkWidget)
         {
-            markEditedLink(nextLinkDataPtr, false);
+            markEditedLink(nextLinkWidget, false);
             return;
         }
-        clearEditLink();
-        prevLinkDataPtr = nullptr;
-        isOutLinkselected = true;
-    }
-
-    if (isOutLinkselected) // try out link again if no more in links
-    {
-        nextLinkDataPtr = static_cast<EgLinkWidget*> (selectedDataNode.getNextOutLinkSerialPtr(graphLinks-> linkBlueprintID, prevLinkDataPtr));
-        if (nextLinkDataPtr)
+        nextLinkWidget = static_cast<EgLinkWidget*> (selectedDataNode.getNextOutLinkSerialPtr(graphLinks-> linkBlueprintID, nullptr));
+        if (nextLinkWidget)
         {
-            markEditedLink(nextLinkDataPtr, true);
+            markEditedLink(nextLinkWidget, true);
             return;
         }
-        clearEditLink();
-        prevLinkDataPtr = nullptr;
-        isOutLinkselected = false; // switch to in links again
+    } else {
+        nextLinkWidget = static_cast<EgLinkWidget*> (selectedDataNode.getNextOutLinkSerialPtr(graphLinks-> linkBlueprintID, nullptr));
+        if (nextLinkWidget)
+        {
+            markEditedLink(nextLinkWidget, true);
+            return;
+        }
+        nextLinkWidget = static_cast<EgLinkWidget*> (selectedDataNode.getNextInLinkSerialPtr(graphLinks-> linkBlueprintID, nullptr));
+        if (nextLinkWidget)
+        {
+            markEditedLink(nextLinkWidget, false);
+            return;
+        }
     }
 }
 
@@ -1298,16 +1270,20 @@ void EgGraphWidget::keyPressEvent(QKeyEvent *event)
     }
 }
 
+/*
 void EgGraphWidget::resizeEvent(QResizeEvent *event)
 {
     // showCanvasRectangle =  globCanvasOrig.x() < event-> size().width() || globCanvasOrig.y() < event-> size().height();
     // cout << "resizeEvent() globCanvasOrig: " << globCanvasOrig.x() << " : " << globCanvasOrig.y() << " showCanvasRectangle: " << showCanvasRectangle << endl;
     QFrame::resizeEvent(event);
-}
+} */
 
 void EgGraphWidget::showEvent(QShowEvent *event)
 {
-    LoadLayersInfo();
-    LoadLayer();
+    // cout << "showEvent() " << endl;
+    if ( ! graphLayers.layersStorage.isConnected) {
+        LoadLayersInfo();
+        LoadLayer();
+    }
     QFrame::showEvent(event);
 }
