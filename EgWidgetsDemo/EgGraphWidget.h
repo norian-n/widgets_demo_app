@@ -3,8 +3,8 @@
 
 #include "metainfo/egDatabase.h"
 #include "links/egLinks.h"
-#include "metainfo/egLayers.h"
-#include "metainfo/egOneLayer.h"
+#include "guisupport/egLayers.h"
+#include "guisupport/egOneLayer.h"
 #include "qtinterface/egQtInterface.h"
 
 #include <QDrag>
@@ -60,6 +60,7 @@ public:
     int zoomFactor                  { 0 };
     EgDataNodeIDType layerID        { 1 };
     EgDataNodeIDType parentLayerID  { 0 };
+    EgDataNodeIDType topLayerID     { 1 };
 
     egRect layerCanvas; // corner, size, egPoint/Size, origX/W, origY/H, scaledX/W, scaledY/H
 
@@ -102,6 +103,7 @@ public:
     void LoadLayersInfo();
     void LoadLayer();
     void LayerUp();
+    void newTopLayer();
 
     void LoadDataLinks();
     inline void ShowDataLink(EgLinkWidget* newLinkWidget);
@@ -120,6 +122,8 @@ public:
     inline void moveResizeNodeWidget(EgNodeWidget* theWidget);
     void moveResizeLinkWidget(EgLinkWidget* theWidget);
 
+    inline void globShiftPoint(int deltaX, int deltaY, int deltaXOrig, int deltaYOrig, egPoint& widgetRect);
+    inline void globalShiftCanvas(int deltaX, int deltaY);
     inline void updateLayerCanvas();
 
     inline void connectPressAction(QPoint clickPoint, QDrag* dragPtr);

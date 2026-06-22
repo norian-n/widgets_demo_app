@@ -15,11 +15,11 @@
 using namespace std;
 
 EgGraphWidget::EgGraphWidget(QWidget *parent)
-    : QFrame(parent), itemData (new QByteArray), globPainter (new QPainter), pixmapTmp (new QPixmap)
+    : QFrame(parent), itemData (new QByteArray), globPainter (new QPainter), pixmapTmp (new QPixmap) // free in destructor
 {
     setFocusPolicy(Qt::WheelFocus);
 
-    arrowIcon = new EgLinkWidget(this);  // dynamic connect link arrow, delete in destructor
+    arrowIcon = new EgLinkWidget(this);  // dynamic connect link arrow, free in destructor
     arrowIcon-> setWhatsThis(QString("arrow"));
     arrowIcon-> setMouseTracking(false);
     arrowIcon-> lineType = directConnect;
@@ -113,6 +113,58 @@ void EgGraphWidget::moveResizeLinkWidget(EgLinkWidget* theWidget)
     theWidget-> move  (theWidget-> linkRect.corner.scaledX,  theWidget-> linkRect.corner.scaledY);
 }
 
+inline void EgGraphWidget::globShiftPoint(int deltaX, int deltaY, int deltaXOrig, int deltaYOrig, egPoint& widgetPoint)
+{
+    widgetPoint.origX += deltaXOrig;
+    widgetPoint.origY += deltaYOrig;
+    widgetPoint.scaledX += deltaX;
+    widgetPoint.scaledY += deltaY;
+}
+
+inline void EgGraphWidget::globalShiftCanvas(int deltaX, int deltaY)
+{
+    int deltaXOrig {0};
+    int deltaYOrig {0};
+    scaledToOrigScalar (deltaX, deltaXOrig, zoomFactor); // recalc to orig
+    scaledToOrigScalar (deltaY, deltaYOrig, zoomFactor);
+
+    layerCanvas.size.scaledW += deltaX; // increase canvas size
+    layerCanvas.size.scaledH += deltaY;
+    layerCanvas.size.origW += deltaXOrig;
+    layerCanvas.size.origH += deltaYOrig;
+
+    graphLayers[layerID]->layerWidth = layerCanvas.size.origW; // save new canvas size
+    graphLayers[layerID]->layerHeight = layerCanvas.size.origH;
+    graphLayers.updateWH(layerID, layerCanvas.size.origW, layerCanvas.size.origH);
+    setMinimumSize(layerCanvas.size.origW, layerCanvas.size.origH);
+
+    if (graphNodes-> isConnected)     // shift all widgets
+    {
+        for (auto nodesIter : graphNodes-> dataMap)
+        {
+            EgNodeWidget* nodeWidget = static_cast<EgNodeWidget*> (nodesIter.second-> serialDataPtr);
+            globShiftPoint(deltaX, deltaY, deltaXOrig, deltaYOrig, nodeWidget-> nodeRect.corner); // increase widget pos
+            // origToScaledRectCanvas   (nodeWidget->nodeRect, zoomFactor, layerCanvas.corner);
+            moveResizeNodeWidget(nodeWidget);
+            graphNodes-> MarkUpdatedDataNode(nodeWidget-> dataNodeID);
+        }
+    }
+    if (graphLinks->linksDataStorage.isConnected)
+    {
+        for (auto linksIter : graphLinks->dataMap)
+        {
+            EgLinkWidget* linkWidget = static_cast<EgLinkWidget*> (linksIter.second-> serialDataPtr);
+            globShiftPoint(deltaX, deltaY, deltaXOrig, deltaYOrig, linkWidget-> linkPointStart);    // increase widget pos
+            globShiftPoint(deltaX, deltaY, deltaXOrig, deltaYOrig, linkWidget-> linkPointEnd);
+
+            linkWidget-> calcLinkWidgetRect(zoomFactor, scaledGlobalIndent);
+            moveResizeLinkWidget(linkWidget);
+            linkWidget-> lower();
+            graphLinks-> MarkUpdatedLink(linkWidget-> dataLinkID);
+        }
+    }
+    repaint();
+}
 
 inline void EgGraphWidget::updateLayerCanvas()
 {
@@ -203,7 +255,10 @@ void loadNodeObjectFromDb (EgDataNode& dataNode) //  pumped to dataNode.serialDa
 
     int tmpColor;
     dataNode["fillColor"]   >> tmpColor;
-    nodeWidget-> fillColor = QColor(tmpColor);
+    if (tmpColor)
+        nodeWidget-> fillColor = QColor(tmpColor);
+    else
+        nodeWidget-> fillColor = QColor(Qt::white);
 
     if (dataNode["image"].dataSize) // && nodeWidget->pixmap
     {
@@ -214,7 +269,7 @@ void loadNodeObjectFromDb (EgDataNode& dataNode) //  pumped to dataNode.serialDa
     }
 
     resetToOrigRect(nodeWidget-> nodeRect);
-    // cout << "loadNodeObjectFromDb() nodeName: " << newNodePtr-> labelText.toStdString() << endl;
+    // cout << "loadNodeObjectFromDb() nodeName: " << nodeWidget-> labelText.toStdString() << endl;
 }
 
 void storeNodeObjectToDb  (EgDataNode& dataNode)
@@ -469,6 +524,9 @@ void EgGraphWidget::LoadLayersInfo()
     if ( ! graphLayers.layersStorage.isConnected) {
         graphLayers.ConnectLayers("demoAppLayers", graphDB); // FIXME literal
         graphLayers.LoadLayers();
+        graphDB.topLayerIDByName("demoAppLayers", layerID);
+        topLayerID = layerID;
+        // cout << "LoadLayersInfo() top layer ID: " << dec << layerID << endl;
     }
 }
 
@@ -480,6 +538,8 @@ void EgGraphWidget::LoadLayer()
     QString nodeLabel;
     if (dataNodeWidget)
         nodeLabel = dataNodeWidget->labelText;
+    else
+        nodeLabel = "upper layer node"; // FIXME STUB, get name to layer data
 
     clearLayer();
     if(! graphLayers[layerID]) {
@@ -515,11 +575,16 @@ void EgGraphWidget::LoadLayer()
 
 void EgGraphWidget::LayerUp()
 {
-    if (layerID > 1) {
+    if (layerID != topLayerID)
+    {
         StoreDataNodes();
         StoreDataLinks();
         layerID = parentLayerID;
         LoadLayer();
+
+        // QThread::msleep(1000);
+        // globalShiftCanvas(200, 200);
+
         // QString numStr = QString::number(layerID);
         // myForm->ui->layerNumLabel-> setText(numStr);
         for (auto iter: deleteWidgets) // delayed node widgets cleanup
@@ -772,6 +837,30 @@ void EgGraphWidget::detailsLayerPressAction()
 
 }
 
+void EgGraphWidget::newTopLayer()
+{
+    EgDataNodeIDType newTopLayerID {0};
+
+    QMessageBox msgBox;
+    msgBox.setText("Create new top layer?");
+    msgBox.setStandardButtons(QMessageBox::Ok | QMessageBox::Cancel);
+    msgBox.setDefaultButton(QMessageBox::Cancel); // Set Cancel as the default focused button
+    if (msgBox.exec() != QMessageBox::Ok)
+        return;
+
+    // cout << " newTopLayer() graphNodes-> nodesSetName: " << graphNodes-> nodesSetName << endl;
+
+    graphLayers.createNewTopLayer(layerID, newTopLayerID, defaultCanvasW, defaultCanvasH, graphNodes-> nodesSetName, "layerNodesBlueprint", "layerLinksBlueprint");
+    cout << " newTopLayer() newTopLayerID: " << dec << newTopLayerID << endl;
+
+    // if (dataNodeWidget)
+    StoreDataNodes();
+    StoreDataLinks();
+    layerID    = newTopLayerID;
+    topLayerID = newTopLayerID;
+    LoadLayer();
+}
+
 void EgGraphWidget::mousePressEvent(QMouseEvent *event)
 {
     resizeMode =     false;
@@ -938,8 +1027,25 @@ inline void EgGraphWidget::moveDropAction(QPoint dropPoint, bool newNode)
     // cout << "resizeMode: " << resizeMode << " newNode: " << newNode << endl;
     if (! resizeMode)
     {
-        dropPoint.setX(std::max (dropPoint.x(), layerCanvas.corner.scaledX + scaledGlobalIndent)); // FIXME expand canvas to left
-        dropPoint.setY(std::max (dropPoint.y(), layerCanvas.corner.scaledY + scaledGlobalIndent));
+        int expandX {0};
+        int expandY {0};
+
+        if (dropPoint.x() < layerCanvas.corner.scaledX + scaledGlobalIndent) { // FIXME expand canvas to left or top
+            // cout << "moveDropAction(): expand X" << endl;
+            expandX = layerCanvas.corner.scaledX + scaledGlobalIndent - dropPoint.x();
+
+        }
+        if (dropPoint.y() < layerCanvas.corner.scaledY + scaledGlobalIndent) {
+            // cout << "moveDropAction(): expand Y" << endl;
+            expandY = layerCanvas.corner.scaledY + scaledGlobalIndent - dropPoint.y();
+        }
+
+        if (expandX || expandY) {
+            globalShiftCanvas(expandX, expandY);
+        }
+
+        // dropPoint.setX(std::max (dropPoint.x(), layerCanvas.corner.scaledX + scaledGlobalIndent)); // FIXME expand canvas to left
+        // dropPoint.setY(std::max (dropPoint.y(), layerCanvas.corner.scaledY + scaledGlobalIndent));
 
         if (newNode) // new node dragged-dropped
         {
@@ -1107,7 +1213,7 @@ void EgGraphWidget::wheelEvent(QWheelEvent *event)
     if (event->angleDelta().y() != 0) {
         int oldZoomFactor = zoomFactor;
         if (event->angleDelta().y() > 0) {
-            if (zoomFactor > 0)
+            if (zoomFactor >  0) // - (maxZoomFactor-1)
                 zoomFactor--;
         } else {
             if (zoomFactor < maxZoomFactor)

@@ -50,7 +50,7 @@ EgGraphForm::EgGraphForm(QWidget *parent) :
 
     this->resize(1200, 800);
 
-    lockFileDesc = writeLockFile("egWidgetsDemoLock.lck"); // master lock
+    lockFileDesc = lockFile("egWidgetsDemoLock.lck"); // master lock
 
     if (lockFileDesc < 0)
         cout << "Database is locked by other app instance, exit" << endl; // exit in main.cpp
@@ -69,23 +69,6 @@ EgGraphForm::~EgGraphForm()
         unlockFile(lockFileDesc);
 }
 
-void EgGraphForm::showEvent(QShowEvent *event)
-{
-    /* lockFileDesc = lockFile("egWidgetsDemoLock.lck");
-
-    if (lockFileDesc < 0) { //
-        cout << "Database is locked by other instance, exit" << endl;
-        qApp->quit();
-    } */
-}
-
-
-/*
-void EgGraphForm::LoadImages()
-{
-
-} */
-
 inline void EgGraphForm::clearButtons()
 {
     ui->moveModeButton->     setStyleSheet("background-color: white;");
@@ -98,38 +81,6 @@ inline void EgGraphForm::clearButtons()
     GraphWidget-> clearEditLink();
     GraphWidget-> setAcceptDrops(true);
 }
-
-/*
-void EgGraphForm::on_loadButton_clicked()
-{
-    clearButtons();
-
-    GraphWidget-> clearLayer();
-    // GraphWidget-> LoadDataNodes();
-    // GraphWidget-> LoadDataLinks();
-
-    GraphWidget-> LoadLayer();
-
-    GraphWidget-> actionMode = moveMode;
-    ui->moveModeButton-> setStyleSheet("background-color: lightgreen;");
-}
-*/
-
-/*
-void EgGraphForm::on_saveButton_clicked()
-{
-    GraphWidget-> StoreDataNodes();
-    GraphWidget-> StoreDataLinks();
-}
-
-void EgGraphForm::on_clearButton_clicked()
-{
-    GraphWidget-> clearLayer();
-    clearButtons();
-    GraphWidget-> actionMode = moveMode;
-    ui->moveModeButton-> setStyleSheet("background-color: lightgreen;");
-}
-*/
 
 void EgGraphForm::on_moveModeButton_clicked()
 {
@@ -218,5 +169,11 @@ void EgGraphForm::on_detailsButton_clicked()
 void EgGraphForm::on_openTableButton_clicked()
 {
     GraphWidget-> OpenTableForm();
+}
+
+
+void EgGraphForm::on_newTopLayerButton_clicked()
+{
+    GraphWidget-> newTopLayer();
 }
 

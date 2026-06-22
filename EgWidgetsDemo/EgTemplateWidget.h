@@ -17,12 +17,14 @@ class EgTemplateWidget : public QWidget
     Q_OBJECT
 
 public:
-    QPainter* nodePainter  {nullptr};
+    QPainter* nodePainter {nullptr};
 
-    QString labelText      {"New node"};
-    QColor  fillColor      {Qt::green};
+    QString labelText     {"New node"};
+    QColor  fillColor     {Qt::green};
 
-    // QString imagePath;
+    int paletteIndex      { 0 };
+    // QString paletteNodesSet;
+    // EgDataNodeIDType paletteNodeID;
 
     EgTemplateWidget(QWidget *parent = 0);
     ~EgTemplateWidget();

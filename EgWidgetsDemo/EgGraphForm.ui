@@ -20,7 +20,7 @@
       <x>790</x>
       <y>80</y>
       <width>98</width>
-      <height>215</height>
+      <height>241</height>
      </rect>
     </property>
     <property name="sizePolicy">
@@ -143,6 +143,13 @@
         </size>
        </property>
       </spacer>
+     </item>
+     <item>
+      <widget class="QPushButton" name="newTopLayerButton">
+       <property name="text">
+        <string>+TopLayer</string>
+       </property>
+      </widget>
      </item>
      <item>
       <widget class="QPushButton" name="settingsButton">

@@ -8,8 +8,10 @@
 #include <QList>
 
 #include "nodes/egDataNodesSet.h"
-#include "metainfo/egLayers.h"
-#include "metainfo/egLiterals.h"
+#include "guisupport/egLayers.h"
+// #include "metainfo/egLiteralsMetainfo.h"
+#include "guisupport/egPalettes.h"
+#include "guisupport/egOnePalette.h"
 
 using namespace std;
 
@@ -42,21 +44,43 @@ void EgSettingsForm::on_initButton_clicked()
 
     cout << "===== Init sample data " << " =====" << endl;
     EgDatabase graphDB;
-    EgLayers   initLayers;
+    EgDataNodeIDType topLayerID;
+
+    graphDB.CreateLayersSet ("demoAppLayers"); // workbench layers set
 
     createNodesBlueprint("layerNodesBlueprint", graphDB);
     graphDB.CreateNodesSetByBlueprint("layerNodes", "layerNodesBlueprint");
     createLinksBlueprint("layerLinksBlueprint", graphDB);
     graphDB.CreateLinksSetByBlueprint("layerLinks", "layerLinksBlueprint", "layerNodes", "layerNodes");
-
-    graphDB.CreateLayersSet ("demoAppLayers");
+    EgLayers   initLayers;
     initLayers.ConnectLayers("demoAppLayers", graphDB);
-
-    EgDataNodeIDType topLayerID;
     initLayers.createBlankLayer(topLayerID, 0, defaultCanvasW, defaultCanvasH, "layerNodes", "layerLinks");  // create top layer
-
     // cout << "top LayerID: " << topLayerID << endl;
     initLayers.StoreLayers();
+
+    graphDB.CreateLayersSet ("demoAppStorageRackLayers"); // storageRack layers set
+
+    graphDB.CreateNodesSetByBlueprint("storageRackLayerNodes", "layerNodesBlueprint");
+    graphDB.CreateLinksSetByBlueprint("storageRackLayerLinks", "layerLinksBlueprint", "storageRackLayerNodes", "storageRackLayerNodes");
+    EgLayers   initStorageRackLayers;
+    initStorageRackLayers.ConnectLayers("demoAppStorageRackLayers", graphDB);
+    initStorageRackLayers.createBlankLayer(topLayerID, 0, defaultCanvasW, defaultCanvasH, "storageRackLayerNodes", "storageRackLayerLinks");  // create top layer
+    initStorageRackLayers.StoreLayers();
+
+    EgPalettes testPalettes;
+
+    graphDB.CreatePalettesSet("demoPalettesSet");
+    testPalettes.ConnectPalettesSet("demoPalettesSet", graphDB);
+    testPalettes.CreateOnePalette("demoOnePalette");
+    testPalettes.CreateOnePalette("demoTwoPalette");
+
+    EgOnePalette testOneP;
+    testOneP.ConnectPalette("demoOnePalette", graphDB);
+    testOneP.addPaletteWidgetData("testNodesSetName 1", "New node", 1, 1, 0xFFC8FFC8); // 200, 255, 200, 255
+    testOneP.addPaletteWidgetData("testNodesSetName 2", "New node", 2, 2, 0xFFC8C8FF); // 200, 255, 200, 255
+    testOneP.addPaletteWidgetData("testNodesSetName 3", "New node", 3, 3, 0xFFFFC8FF);
+    testOneP.addPaletteWidgetData("testNodesSetName 4", "New node", 4, 4, 0xFFFFFFC8);
+    testOneP.StorePalette();
 
     cout << "===== Init complete =====" << endl;
 
@@ -84,7 +108,7 @@ void EgSettingsForm::createNodesBlueprint(const std::string& name, EgDatabase& g
 
 void EgSettingsForm::createLinksBlueprint(const std::string& linksName, EgDatabase& graphDB)
 {
-    graphDB.CreateLinkWithDataBlueprint(linksName);
+    graphDB.CreateLinkBlueprint(linksName);
 
     graphDB.AddLinkDataField("startPointX");
     graphDB.AddLinkDataField("startPointY");

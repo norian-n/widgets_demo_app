@@ -60,7 +60,6 @@ public:
 protected:
     // void dropEvent(QDropEvent *event) override;
     void closeEvent(QCloseEvent *event) override;
-    void showEvent(QShowEvent *event) override;
 
 private slots:
     void on_moveModeButton_clicked();
@@ -69,15 +68,9 @@ private slots:
     void on_deleteModeButton_clicked();
 
     void on_settingsButton_clicked();
-
-    // void on_lvlUpButton_clicked();
-    // void on_lvlDownButton_clicked();
-    // void on_loadButton_clicked();
-    // void on_saveButton_clicked();
-    // void on_clearButton_clicked();
-    // void on_detailsButton_clicked();
-
     void on_openTableButton_clicked();
+
+    void on_newTopLayerButton_clicked();
 
 private:
     QVBoxLayout* vertLayout;
